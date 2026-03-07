@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
-const flash = require('connect-flash');
 const path = require('path');
 const methodOverride = require('method-override');
 const sqlite3 = require('sqlite3').verbose();
@@ -127,7 +126,32 @@ const { ensureAdmin } = require('./middleware/auth');
       }
     })
   );
-  app.use(flash());
+
+  // Custom flash middleware - stores messages in session, no external dependency
+  app.use((req, res, next) => {
+    if (!req.session) {
+      req.flash = () => '';
+      return next();
+    }
+    
+    if (!req.session.flash) {
+      req.session.flash = {};
+    }
+    
+    req.flash = function(type, message) {
+      if (typeof message === 'string') {
+        // Store message
+        req.session.flash[type] = message;
+        return;
+      }
+      // Retrieve and clear message
+      const msg = req.session.flash[type] || '';
+      delete req.session.flash[type];
+      return msg;
+    };
+    
+    next();
+  });
 
   // set locals middleware
   app.use((req, res, next) => {
