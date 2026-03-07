@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+data
+uploads
+database/*.db
+database/*.sqlite

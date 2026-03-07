@@ -1,0 +1,48 @@
+<%- include('partials/header') %>
+<%- include('partials/messages') %>
+<h2>Gallery</h2>
+<form method="get" class="search-form">
+  <input type="text" name="search" value="<%= search || '' %>" placeholder="Search gallery">
+  <% if (selectedCollection) { %>
+    <input type="hidden" name="collection" value="<%= selectedCollection %>">
+  <% } %>
+  <button type="submit">Search</button>
+</form>
+<div class="page-with-sidebar">
+  <aside class="playlist-panel">
+    <h3>Collections</h3>
+    <div class="playlist-item">
+      <a href="/gallery" class="playlist-link<%= !selectedCollection ? ' active' : '' %>">All Images</a>
+    </div>
+    <% if (collections && collections.length) { %>
+      <% collections.forEach(col => { %>
+        <div class="playlist-item">
+          <a href="/gallery?collection=<%= col.id %>" class="playlist-link<%= selectedCollection == col.id ? ' active' : '' %>">
+            <%= col.title %> (<%= col.count %>)
+          </a>
+        </div>
+      <% }) %>
+    <% } else { %>
+      <p style="font-size:0.85rem; color:#777; margin-top:0.6rem;">No collections yet.</p>
+    <% } %>
+  </aside>
+
+  <div class="gallery-main">
+    <% if (images && images.length) { %>
+      <div class="gallery-grid">
+        <% images.forEach(img => { %>
+          <div class="gallery-item">
+            <a href="/uploads/images/<%= img.filename %>?t=<%= Date.now() %>">
+              <img src="/uploads/images/<%= img.filename %>?t=<%= Date.now() %>" alt="<%= img.title %>">
+            </a>
+            <h3><%= img.title %></h3>
+            <p><%= img.caption %></p>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p>No images yet.</p>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/footer') %>

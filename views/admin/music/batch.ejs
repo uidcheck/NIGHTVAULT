@@ -1,0 +1,33 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin/music" class="back-link">&larr; Back to music management</a>
+<h2>Batch Upload Music</h2>
+<form action="/admin/music/batch" method="post" enctype="multipart/form-data" class="admin-form">
+  <label>Audio Files: <input type="file" name="files" accept="audio/*" multiple required></label>
+  <p style="font-size:0.8rem;color:#888;">Select multiple audio files to upload at once. Metadata will be auto-extracted where available.</p>
+
+  <h3>Shared Album Details</h3>
+  <label>Shared Artist: <input type="text" name="default_artist" placeholder="e.g. Artist Name"></label>
+  <label>Shared Album: <input type="text" name="default_album"></label>
+  <label>Shared Year: <input type="number" name="default_year"></label>
+  <label>Shared Description: <textarea name="shared_description" placeholder="Album description (shown at playlist level)"></textarea></label>
+  <label>Shared Cover Image: <input type="file" name="shared_cover" accept="image/*"></label>
+  <p style="font-size:0.8rem;color:#888;">One cover image for the whole batch. If not provided, embedded covers from files will be used.</p>
+
+  <h3>Playlist Assignment</h3>
+  <label>Assign to Existing Playlist:
+    <select name="playlist_id">
+      <option value="">-- None --</option>
+      <% if (playlists && playlists.length) { %>
+        <% playlists.forEach(p => { %>
+          <option value="<%= p.id %>"><%= p.title %></option>
+        <% }) %>
+      <% } %>
+    </select>
+  </label>
+  <p>or</p>
+  <label>Create New Playlist: <input type="text" name="new_playlist_title" placeholder="e.g. My Album"></label>
+
+  <button type="submit">Upload Batch</button>
+</form>
+<%- include('../../partials/footer') %>

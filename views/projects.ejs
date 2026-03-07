@@ -1,0 +1,82 @@
+<%- include('partials/header') %>
+<%- include('partials/messages') %>
+<h2>Projects</h2>
+<form method="get" class="search-form">
+  <% if (selectedCollection) { %>
+    <input type="hidden" name="collection" value="<%= selectedCollection %>">
+  <% } %>
+  <input type="text" name="search" value="<%= search || '' %>" placeholder="Search projects">
+  <select name="sort">
+    <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest</option>
+    <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest</option>
+    <option value="closed" <%= sort === 'closed' ? 'selected' : '' %>>Closed</option>
+    <option value="ongoing" <%= sort === 'ongoing' ? 'selected' : '' %>>Ongoing</option>
+  </select>
+  <button type="submit">Search</button>
+</form>
+<div class="page-with-sidebar">
+  <aside class="playlist-panel">
+    <h3>Collections</h3>
+    <div class="playlist-item">
+      <a
+        class="playlist-link <%= !selectedCollection ? 'active' : '' %>"
+        href="/projects?<%= search ? ('search=' + encodeURIComponent(search) + '&') : '' %><%= sort ? ('sort=' + encodeURIComponent(sort)) : '' %>"
+      >
+        All Projects
+      </a>
+    </div>
+    <% if (collections && collections.length) { %>
+      <% collections.forEach(col => { %>
+        <div class="playlist-item">
+          <a
+            class="playlist-link <%= selectedCollection === col.id ? 'active' : '' %>"
+            href="/projects?collection=<%= col.id %><%= search ? ('&search=' + encodeURIComponent(search)) : '' %><%= sort ? ('&sort=' + encodeURIComponent(sort)) : '' %>"
+          >
+            <%= col.title %> (<%= col.item_count || 0 %>)
+          </a>
+        </div>
+      <% }) %>
+    <% } else { %>
+      <p style="font-size:0.85rem; color:#777; margin-top:0.6rem;">No collections yet.</p>
+    <% } %>
+  </aside>
+
+  <div class="projects-main">
+
+    <% if (selectedCollectionInfo) { %>
+      <section class="collection-info">
+        <h3><%= selectedCollectionInfo.title %></h3>
+        <% if (selectedCollectionInfo.description) { %>
+          <p><%= selectedCollectionInfo.description %></p>
+        <% } %>
+        <span><%= selectedCollectionInfo.item_count || 0 %> projects</span>
+      </section>
+    <% } %>
+
+    <% if (projects && projects.length) { %>
+      <div class="project-list">
+        <% projects.forEach(proj => { %>
+          <a href="/projects/<%= proj.slug %>" class="project-card">
+            <% if (proj.hero_image) { %>
+              <div class="image-container">
+                <img src="/uploads/projects/<%= proj.hero_image %>?t=<%= Date.now() %>" alt="hero" class="card-image">
+              </div>
+            <% } else { %>
+              <div class="default-hero">
+                <i class="fas fa-project-diagram"></i>
+              </div>
+            <% } %>
+            <div class="card-content">
+              <h3><%= proj.title %></h3>
+              <p class="summary"><%= proj.summary %></p>
+              <% if (proj.status) { %><p class="status">Status: <%= proj.status %></p><% } %>
+            </div>
+          </a>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p>No projects found.</p>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/footer') %>

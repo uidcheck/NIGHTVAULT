@@ -1,0 +1,36 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin" class="back-link">&larr; Back to dashboard</a>
+<h2>Music Management</h2>
+<a href="/admin/music/new" class="btn">Upload New Track</a>
+<a href="/admin/music/batch" class="btn">Batch Upload</a>
+<% if (tracks && tracks.length) { %>
+  <ul class="admin-list">
+    <% tracks.forEach(t => { %>
+      <li>
+        <span class="item-title"><%= t.title %> by <%= t.artist %></span>
+        <% const count = trackPlaylists[t.id] ? trackPlaylists[t.id].length : 0; %>
+        <button type="button" class="toggle-membership">Playlists (<%= count %>)</button>
+        <a href="/admin/music/<%= t.id %>/edit">edit</a> |
+        <form action="/admin/music/<%= t.id %>?_method=DELETE" method="post" style="display:inline;">
+          <button type="submit" class="link-button">delete</button>
+        </form>
+        <div class="membership-panel" style="display:none;">
+          <form method="post" action="/admin/music/<%= t.id %>/playlists">
+            <% if (playlists && playlists.length) { %>
+              <% playlists.forEach(p => { %>
+                <label style="display:block; font-size:0.85rem;">
+                  <input type="checkbox" name="playlists" value="<%= p.id %>" <%= trackPlaylists[t.id] && trackPlaylists[t.id].some(m=>m.id===p.id) ? 'checked' : '' %> > <%= p.title %>
+                </label>
+              <% }) %>
+            <% } %>
+            <button type="submit" class="btn">Save</button>
+          </form>
+        </div>
+      </li>
+    <% }) %>
+  </ul>
+<% } else { %>
+  <p>No tracks yet.</p>
+<% } %>
+<%- include('../../partials/footer') %>

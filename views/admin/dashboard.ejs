@@ -1,0 +1,32 @@
+<%- include('../partials/header') %>
+<%- include('../partials/messages') %>
+<h2>Admin Dashboard</h2>
+<div class="stats">
+  <p>Music: <%= counts.music %></p>
+  <p>Videos: <%= counts.videos %></p>
+  <p>Gallery: <%= counts.gallery %></p>
+  <p>Projects: <%= counts.projects %></p>
+</div>
+<nav class="admin-nav">
+  <h3 style="margin-top: 2rem;">Content Management</h3>
+  <ul>
+    <li><a href="/admin/music">Music</a></li>
+    <li><a href="/admin/videos">Videos</a></li>
+    <li><a href="/admin/gallery">Gallery</a></li>
+    <li><a href="/admin/projects">Projects</a></li>
+  </ul>
+  
+  <h3 style="margin-top: 2rem;">Organization</h3>
+  <ul>
+    <li><a href="/admin/playlists/music">Music Playlists</a></li>
+    <li><a href="/admin/playlists/videos">Video Playlists</a></li>
+    <li><a href="/admin/collections/gallery">Gallery Collections</a></li>
+    <li><a href="/admin/collections/projects">Project Collections</a></li>
+  </ul>
+  
+  <h3 style="margin-top: 2rem;">Account</h3>
+  <ul>
+    <li><a href="/admin/change-password">Change Password</a></li>
+  </ul>
+</nav>
+<%- include('../partials/footer') %>

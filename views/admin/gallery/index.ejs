@@ -1,0 +1,35 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin" class="back-link">&larr; Back to dashboard</a>
+<h2>Gallery Management</h2>
+<a href="/admin/gallery/new" class="btn">Upload Image</a>
+<% if (images && images.length) { %>
+  <ul class="admin-list">
+    <% images.forEach(img => { %>
+      <li>
+        <span class="item-title"><%= img.title || img.filename %></span>
+        <% const count = imageCollections[img.id] ? imageCollections[img.id].length : 0; %>
+        <button type="button" class="toggle-membership">Collections (<%= count %>)</button>
+        <a href="/admin/gallery/<%= img.id %>/edit">edit</a> |
+        <form action="/admin/gallery/<%= img.id %>?_method=DELETE" method="post" style="display:inline;">
+          <button type="submit" class="link-button">delete</button>
+        </form>
+        <div class="membership-panel" style="display:none;">
+          <form method="post" action="/admin/gallery/<%= img.id %>/collections">
+            <% if (collections && collections.length) { %>
+              <% collections.forEach(c => { %>
+                <label style="display:block; font-size:0.85rem;">
+                  <input type="checkbox" name="collections" value="<%= c.id %>" <%= imageCollections[img.id] && imageCollections[img.id].some(m=>m.id===c.id) ? 'checked' : '' %> > <%= c.title %>
+                </label>
+              <% }) %>
+            <% } %>
+            <button type="submit" class="btn">Save</button>
+          </form>
+        </div>
+      </li>
+    <% }) %>
+  </ul>
+<% } else { %>
+  <p>No images yet.</p>
+<% } %>
+<%- include('../../partials/footer') %>

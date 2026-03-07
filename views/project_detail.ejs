@@ -1,0 +1,56 @@
+<%- include('partials/header') %>
+<%- include('partials/messages') %>
+<a href="/projects" class="back-link">&larr; Back to projects</a>
+<div class="project-detail">
+  <% if (project.hero_image) { %>
+    <img src="/uploads/projects/<%= project.hero_image %>?t=<%= Date.now() %>" alt="hero" class="hero">
+  <% } %>
+  <h2><%= project.title %></h2>
+  <% if (project.summary) { %><p class="summary"><%= project.summary %></p><% } %>
+  <p><%= project.description %></p>
+  
+  <% if (documents && documents.length) { %>
+    <section class="project-documents" style="margin: 2rem 0;">
+      <h3>Documents</h3>
+      <ul class="document-list" style="list-style: none; padding: 0;">
+        <% documents.forEach(doc => { %>
+          <li style="padding: 0.5rem 0; border-bottom: 1px solid #333;">
+            <a href="/uploads/documents/<%= doc.filename %>?t=<%= Date.now() %>" target="_blank" style="color: #0ff; text-decoration: none;">
+              📄 <%= doc.original_name %>
+            </a>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+  <% } %>
+  
+  <section class="project-updates" style="margin: 2rem 0;">
+    <h3>Updates</h3>
+    <% if (updates && updates.length) { %>
+      <div class="updates-container">
+        <% updates.forEach(u => { %>
+          <div class="update-card">
+            <div class="update-header">
+              <span class="update-timestamp"><%= new Date(u.created_at).toLocaleDateString() %></span>
+            </div>
+            <div class="update-content"><%= u.content %></div>
+            <% if (u.attachments && u.attachments.length) { %>
+              <div class="update-attachments">
+                <% u.attachments.forEach(att => { %>
+                  <div class="attachment-item">
+                    <a href="/uploads/documents/<%= att.filename %>?t=<%= Date.now() %>" target="_blank">
+                      📎 <%= att.original_name %>
+                    </a>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <p>No updates yet.</p>
+    <% } %>
+  </section>
+</div>
+<%- include('partials/footer') %>

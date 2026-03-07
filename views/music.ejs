@@ -1,0 +1,71 @@
+<%- include('partials/header') %>
+<%- include('partials/messages') %>
+<h2>Music Archive</h2>
+<form method="get" class="search-form">
+  <input type="text" name="search" value="<%= search || '' %>" placeholder="Search tracks">
+  <% if (playlists && playlists.length) { %>
+    <select name="playlist">
+      <option value="">All Tracks</option>
+      <% playlists.forEach(p => { %>
+        <option value="<%= p.id %>" <%= selectedPlaylist == p.id ? 'selected' : '' %>><%= p.title %></option>
+      <% }) %>
+    </select>
+  <% } %>
+  <button type="submit">Search/Filter</button>
+</form>
+<div class="page-with-sidebar">
+  <aside class="playlist-panel">
+    <h3>Playlists</h3>
+    <div class="playlist-item">
+      <a href="/music" class="playlist-link<%= !selectedPlaylist ? ' active' : '' %>">All Tracks</a>
+    </div>
+    <% if (playlists && playlists.length) { %>
+      <% playlists.forEach(pl => { %>
+        <div class="playlist-item">
+          <a href="/music?playlist=<%= pl.id %>" class="playlist-link<%= selectedPlaylist == pl.id ? ' active' : '' %>">
+            <%= pl.title %> (<%= pl.items ? pl.items.length : 0 %>)
+          </a>
+          <% if (pl.description) { %>
+            <p class="playlist-description"><%= pl.description %></p>
+          <% } %>
+          <% if (pl.items && pl.items.length) { %>
+            <ul>
+              <% pl.items.forEach(item => { %>
+                <li><%= item.title %></li>
+              <% }) %>
+            </ul>
+          <% } %>
+        </div>
+      <% }) %>
+    <% } else { %>
+      <p style="font-size:0.85rem; color:#777; margin-top:0.6rem;">No playlists yet.</p>
+    <% } %>
+  </aside>
+
+  <div class="music-grid">
+    <% if (tracks && tracks.length) { %>
+      <% tracks.forEach(track => { %>
+        <div class="music-card" data-filename="<%= track.filename %>">
+          <div class="cover-container">
+            <% if (track.cover_image) { %>
+              <img src="/uploads/music/<%= track.cover_image %>?t=<%= Date.now() %>" alt="cover" class="cover">
+            <% } else { %>
+              <div class="default-cover">
+                <i class="fas fa-music"></i>
+              </div>
+            <% } %>
+          </div>
+          <h3><%= track.title %></h3>
+          <p class="meta">
+            <% if (track.artist) { %><span><%= track.artist %></span><% } %>
+            <% if (track.album) { %><span><%= track.artist ? ' - ' : '' %><%= track.album %></span><% } %>
+            <% if (track.year) { %><span><%= (track.artist||track.album) ? ' (' : '' %><%= track.year %><%= (track.artist||track.album) ? ')' : '' %></span><% } %>
+          </p>
+        </div>
+      <% }); %>
+    <% } else { %>
+      <p>No tracks available.</p>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/footer') %>

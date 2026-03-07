@@ -1,0 +1,39 @@
+<%- include('partials/header') %>
+<%- include('partials/messages') %>
+<h2>Search Results for "<%= query %>"</h2>
+<% if (results.music && results.music.length) { %>
+  <h3>Music</h3>
+  <ul>
+    <% results.music.forEach(track => { %>
+      <li><a href="/music"><%= track.title %> by <%= track.artist %></a></li>
+    <% }) %>
+  </ul>
+<% } %>
+<% if (results.videos && results.videos.length) { %>
+  <h3>Videos</h3>
+  <ul>
+    <% results.videos.forEach(video => { %>
+      <li><a href="/videos"><%= video.title %></a></li>
+    <% }) %>
+  </ul>
+<% } %>
+<% if (results.gallery && results.gallery.length) { %>
+  <h3>Gallery</h3>
+  <ul>
+    <% results.gallery.forEach(img => { %>
+      <li><a href="/gallery"><%= img.title %></a></li>
+    <% }) %>
+  </ul>
+<% } %>
+<% if (results.projects && results.projects.length) { %>
+  <h3>Projects</h3>
+  <ul>
+    <% results.projects.forEach(proj => { %>
+      <li><a href="/projects/<%= proj.slug %>"><%= proj.title %></a></li>
+    <% }) %>
+  </ul>
+<% } %>
+<% if (!results.music.length && !results.videos.length && !results.gallery.length && !results.projects.length) { %>
+  <p>No results found.</p>
+<% } %>
+<%- include('partials/footer') %>

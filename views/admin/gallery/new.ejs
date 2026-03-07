@@ -1,0 +1,22 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin/gallery" class="back-link">&larr; Back to gallery management</a>
+<h2>Upload Image</h2>
+<form action="/admin/gallery" method="post" enctype="multipart/form-data" class="admin-form">
+  <label>Title: <input type="text" name="title"></label>
+  <label>Caption:<textarea name="caption"></textarea></label>
+  <label>Category: <input type="text" name="category"></label>
+  <label>Image File: <input type="file" name="file" accept="image/*" required></label>
+  <% if (collections && collections.length) { %>
+    <label>Collections:
+      <select name="collections" multiple size="4">
+        <% collections.forEach(c => { %>
+          <option value="<%= c.id %>"><%= c.title %></option>
+        <% }) %>
+      </select>
+    </label>
+    <p style="font-size:0.8rem;color:#888;">(hold Ctrl/Cmd to select multiple)</p>
+  <% } %>
+  <button type="submit">Upload</button>
+</form>
+<%- include('../../partials/footer') %>

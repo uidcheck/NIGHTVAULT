@@ -1,0 +1,36 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin" class="back-link">&larr; Back to dashboard</a>
+<h2>Projects Management</h2>
+<a href="/admin/projects/new" class="btn">New Project</a>
+<a href="/admin/collections/projects" class="btn">Manage Collections</a>
+<% if (projects && projects.length) { %>
+  <ul class="admin-list">
+    <% projects.forEach(p => { %>
+      <li>
+        <span class="item-title"><%= p.title %></span>
+        <% const count = projectCollections[p.id] ? projectCollections[p.id].length : 0; %>
+        <button type="button" class="toggle-membership">Collections (<%= count %>)</button>
+        <a href="/admin/projects/<%= p.id %>/edit">edit</a> |
+        <form action="/admin/projects/<%= p.id %>?_method=DELETE" method="post" style="display:inline;">
+          <button type="submit" class="link-button">delete</button>
+        </form>
+        <div class="membership-panel" style="display:none;">
+          <form method="post" action="/admin/projects/<%= p.id %>/collections">
+            <% if (collections && collections.length) { %>
+              <% collections.forEach(c => { %>
+                <label style="display:block; font-size:0.85rem;">
+                  <input type="checkbox" name="collections" value="<%= c.id %>" <%= projectCollections[p.id] && projectCollections[p.id].some(m=>m.id===c.id) ? 'checked' : '' %> > <%= c.title %>
+                </label>
+              <% }) %>
+            <% } %>
+            <button type="submit" class="btn">Save</button>
+          </form>
+        </div>
+      </li>
+    <% }) %>
+  </ul>
+<% } else { %>
+  <p>No projects yet.</p>
+<% } %>
+<%- include('../../partials/footer') %>

@@ -1,0 +1,33 @@
+<%- include('partials/header') %>
+<%- include('partials/messages') %>
+<section class="intro">
+  <h2>Creative Archive</h2>
+  <p>A collection of music, media and experimental projects.</p>
+  <form action="/search" method="get" class="search-form">
+    <input type="text" name="q" placeholder="Search music, videos, gallery, projects..." required>
+    <button type="submit">Search</button>
+  </form>
+</section>
+<section class="features">
+  <div class="card">
+    <h3>Music</h3>
+    <p>Listen to tracks and albums.</p>
+    <a href="/music" class="btn">Enter</a>
+  </div>
+  <div class="card">
+    <h3>Videos</h3>
+    <p>Watch a curated selection of video work.</p>
+    <a href="/videos" class="btn">Enter</a>
+  </div>
+  <div class="card">
+    <h3>Gallery</h3>
+    <p>Browse images and visual pieces.</p>
+    <a href="/gallery" class="btn">Enter</a>
+  </div>
+  <div class="card">
+    <h3>Projects</h3>
+    <p>Explore ongoing and past projects.</p>
+    <a href="/projects" class="btn">Enter</a>
+  </div>
+</section>
+<%- include('partials/footer') %>

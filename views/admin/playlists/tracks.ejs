@@ -1,0 +1,62 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin/playlists/music" class="back-link">&larr; Back to music playlists</a>
+<h2>Manage Track Order - <%= playlist.title %></h2>
+<p style="color: #888; margin-bottom: 1rem;">Set exact order numbers, then save all changes in one action.</p>
+
+<% if (tracks && tracks.length) { %>
+  <form action="/admin/playlists/music/<%= playlist.id %>/order" method="post">
+    <div style="display:flex; gap:0.6rem; margin-bottom:1rem; flex-wrap:wrap;">
+      <button type="submit" class="btn">Save All Changes</button>
+      <button type="button" id="auto-renumber" class="btn">Auto-renumber Sequentially</button>
+    </div>
+    <ul class="admin-list">
+      <% tracks.forEach((track, idx) => { %>
+        <li style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+          <span class="item-title">
+            <%= track.title %>
+            <% if (track.artist) { %>
+              by <%= track.artist %>
+            <% } %>
+          </span>
+
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <label style="display:flex; align-items:center; gap:0.4rem;">
+              <span style="font-size:0.85rem; color:#aaa;">Order</span>
+              <input
+                type="number"
+                name="order_values"
+                value="<%= track.order_index == null ? (idx + 1) : track.order_index %>"
+                min="1"
+                step="1"
+                class="order-input"
+                style="width:5.5rem;"
+              >
+            </label>
+            <input type="hidden" name="track_ids" value="<%= track.id %>">
+
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  </form>
+  <script>
+    (function () {
+      const renumberBtn = document.getElementById('auto-renumber');
+      if (!renumberBtn) return;
+      renumberBtn.addEventListener('click', function () {
+        const inputs = document.querySelectorAll('.order-input');
+        inputs.forEach(function (input, index) {
+          input.value = index + 1;
+        });
+      });
+    })();
+  </script>
+<% } else { %>
+  <p>No tracks in this playlist yet.</p>
+<% } %>
+
+<div style="margin-top: 2rem;">
+  <a href="/admin/playlists/music">← Back to Playlists</a>
+</div>
+<%- include('../../partials/footer') %>

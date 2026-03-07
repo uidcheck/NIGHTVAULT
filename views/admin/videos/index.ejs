@@ -1,0 +1,35 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin" class="back-link">&larr; Back to dashboard</a>
+<h2>Video Management</h2>
+<a href="/admin/videos/new" class="btn">Add Video</a>
+<% if (videos && videos.length) { %>
+  <ul class="admin-list">
+    <% videos.forEach(v => { %>
+      <li>
+        <span class="item-title"><%= v.title %></span>
+        <% const count = videoPlaylists[v.id] ? videoPlaylists[v.id].length : 0; %>
+        <button type="button" class="toggle-membership">Playlists (<%= count %>)</button>
+        <a href="/admin/videos/<%= v.id %>/edit">edit</a> |
+        <form action="/admin/videos/<%= v.id %>?_method=DELETE" method="post" style="display:inline;">
+          <button type="submit" class="link-button">delete</button>
+        </form>
+        <div class="membership-panel" style="display:none;">
+          <form method="post" action="/admin/videos/<%= v.id %>/playlists">
+            <% if (playlists && playlists.length) { %>
+              <% playlists.forEach(p => { %>
+                <label style="display:block; font-size:0.85rem;">
+                  <input type="checkbox" name="playlists" value="<%= p.id %>" <%= videoPlaylists[v.id] && videoPlaylists[v.id].some(m=>m.id===p.id) ? 'checked' : '' %> > <%= p.title %>
+                </label>
+              <% }) %>
+            <% } %>
+            <button type="submit" class="btn">Save</button>
+          </form>
+        </div>
+      </li>
+    <% }) %>
+  </ul>
+<% } else { %>
+  <p>No videos yet.</p>
+<% } %>
+<%- include('../../partials/footer') %>

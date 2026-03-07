@@ -1,0 +1,16 @@
+services:
+  paracausal:
+    build: .
+    container_name: paracausal
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_PATH: /app/data/paracausal.db
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads

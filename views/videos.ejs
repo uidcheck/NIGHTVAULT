@@ -1,0 +1,66 @@
+<%- include('partials/header') %>
+<%- include('partials/messages') %>
+<h2>Videos Archive</h2>
+<form method="get" class="search-form">
+  <input type="text" name="search" value="<%= search || '' %>" placeholder="Search videos">
+  <input type="text" name="category" value="<%= category || '' %>" placeholder="Category">
+  <% if (playlists && playlists.length) { %>
+    <select name="playlist">
+      <option value="">All Videos</option>
+      <% playlists.forEach(p => { %>
+        <option value="<%= p.id %>" <%= selectedPlaylist == p.id ? 'selected' : '' %>><%= p.title %></option>
+      <% }) %>
+    </select>
+  <% } %>
+  <button type="submit">Search/Filter</button>
+</form>
+<div class="page-with-sidebar">
+  <aside class="playlist-panel">
+    <h3>Playlists</h3>
+    <div class="playlist-item">
+      <a href="/videos" class="playlist-link<%= !selectedPlaylist ? ' active' : '' %>">All Videos</a>
+    </div>
+    <% if (playlists && playlists.length) { %>
+      <% playlists.forEach(pl => { %>
+        <div class="playlist-item">
+          <a href="/videos?playlist=<%= pl.id %>" class="playlist-link<%= selectedPlaylist == pl.id ? ' active' : '' %>">
+            <%= pl.title %> (<%= pl.items ? pl.items.length : 0 %>)
+          </a>
+          <% if (pl.items && pl.items.length) { %>
+            <ul>
+              <% pl.items.forEach(item => { %>
+                <li><%= item.title %></li>
+              <% }) %>
+            </ul>
+          <% } %>
+        </div>
+      <% }) %>
+    <% } else { %>
+      <p style="font-size:0.85rem; color:#777; margin-top:0.6rem;">No playlists yet.</p>
+    <% } %>
+  </aside>
+
+  <div class="video-grid">
+    <% if (videos && videos.length) { %>
+      <% videos.forEach(video => { %>
+        <a class="video-card" href="/videos/<%= video.id %>" style="display: block;">
+          <% if (video.thumbnail) { %>
+            <img src="/uploads/videos/<%= video.thumbnail %>" alt="<%= video.title %>">
+          <% } else { %>
+            <div class="default-thumbnail">
+              <i class="fas fa-video"></i>
+            </div>
+          <% } %>
+          <h3><%= video.title %></h3>
+          <% if (video.description) { %><p><%= video.description %></p><% } %>
+          <% if (video.category) { %>
+            <p class="meta">Category: <%= video.category %></p>
+          <% } %>
+        </a>
+      <% }) %>
+    <% } else { %>
+      <p>No videos available.</p>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/footer') %>

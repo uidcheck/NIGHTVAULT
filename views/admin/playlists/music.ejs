@@ -1,0 +1,42 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin" class="back-link">&larr; Back to dashboard</a>
+<h2>Music Playlists</h2>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+  <div>
+    <h3>Create New Playlist</h3>
+    <form action="/admin/playlists/music" method="post" class="admin-form">
+      <label>Title: <input type="text" name="title" required></label>
+      <label>Description: <textarea name="description"></textarea></label>
+      <button type="submit">Create</button>
+    </form>
+  </div>
+
+  <div>
+    <h3>Playlists</h3>
+    <% if (playlists && playlists.length) { %>
+      <ul class="admin-list">
+        <% playlists.forEach(p => { %>
+          <li>
+            <strong><%= p.title %></strong>
+            <% if (p.description) { %><p style="font-size: 0.85rem; color: #888; margin: 0.3rem 0;"><%= p.description %></p><% } %>
+            <a href="/admin/playlists/music/<%= p.id %>/edit">edit</a> |
+            <a href="/admin/playlists/music/<%= p.id %>/tracks">tracks</a> |
+            <form action="/admin/playlists/music/<%= p.id %>?_method=DELETE" method="post" style="display:inline;">
+              <button type="submit" class="link-button">delete</button>
+            </form>
+          </li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p>No playlists yet.</p>
+    <% } %>
+  </div>
+</div>
+
+<h3 style="margin-top: 2rem;">Add Music to Playlist</h3>
+<p style="color: #888; font-size: 0.9rem;">Select a playlist and music track to add:</p>
+<!-- This would require database queries in the route -->
+<p style="color: #666; font-size: 0.85rem;">Feature link: Use admin music listing to assign tracks to playlists</p>
+<%- include('../../partials/footer') %>

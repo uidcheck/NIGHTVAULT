@@ -1,0 +1,948 @@
+/* global resets */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  background-color: #000;
+  background-image: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url('/images/site-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  color: #eee;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  line-height: 1.4;
+  padding: 0 1rem;
+  padding-bottom: 280px;
+}
+
+/* heading typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 700;
+}
+.site-title a {
+  color: #095F80;
+  text-decoration: none;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 700;
+}
+p {
+  color: #ccc;
+}
+header {
+  text-align: center;
+  padding: 1rem 0;
+}
+.tagline {
+  font-size: 0.9rem;
+  color: #888;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+nav {
+  margin-top: 0.5rem;
+}
+.nav-list {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+.nav-list a {
+  color: #ccc;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+.nav-list a:hover {
+  color: #710280;
+}
+.back-link {
+  display: inline-block;
+  color: #095F80;
+  text-decoration: none;
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+}
+.back-link:hover {
+  color: #710280;
+}
+main {
+  max-width: 900px;
+  margin: 2rem auto;
+}
+footer {
+  text-align: center;
+  padding: 1rem 0;
+  color: #555;
+  font-size: 0.8rem;
+}
+.intro {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
+  gap: 1rem;
+}
+.card {
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  padding: 1rem;
+  text-align: center;
+}
+.card .btn {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  background: none;
+  border: 1px solid #095F80;
+  color: #095F80;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+.card .btn:hover {
+  background: #095F80;
+  color: #000;
+}
+/* music grid */
+.music-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.music-card {
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: border-color 0.2s;
+  cursor: pointer;
+}
+.music-card:hover {
+  border-color: #095F80;
+}
+.music-card h3 {
+  margin: 0.5rem 0 0.3rem;
+  font-size: 0.95rem;
+  word-break: break-word;
+}
+.music-card .meta {
+  color: #ccc;
+  font-size: 0.8rem;
+  margin: 0.2rem 0;
+  line-height: 1.2;
+}
+.music-card .description {
+  color: #aaa;
+  font-size: 0.75rem;
+  margin: 0.3rem 0 0 0;
+  text-align: left;
+  max-height: 3.6rem; /* limit to ~3 lines */
+  overflow: hidden;
+}
+.cover-container {
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #222;
+  margin-bottom: 0.5rem;
+}
+.cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.cover:hover {
+  opacity: 0.8;
+}
+.default-cover {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #333;
+  color: #888;
+  font-size: 3rem;
+}
+.default-cover i {
+  opacity: 0.7;
+}
+
+.audio-player {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(17, 17, 17, 0.98);
+  border-top: 1px solid #095F80;
+  padding: 0.6rem 1rem;
+  z-index: 999;
+  max-width: 100%;
+  box-shadow: 0 -2px 12px rgba(9, 95, 128, 0.2);
+}
+#waveform {
+  height: 50px;
+  width: 100%; /* fill the middle-group space */
+  background: #222;
+  border-radius: 4px;
+  margin: 0 0.5rem;
+  border: 1px solid #333;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.controls .left-group {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+}
+.controls .middle-group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+}
+.controls .right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+}
+.controls button {
+  padding: 0.3rem 0.6rem;
+  background: #095F80;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.controls button:hover {
+  background: #0a7a9e;
+}
+#play-pause {
+  min-width: 60px;
+  text-align: center;
+}
+
+.now-playing-text {
+  margin-left: 0.6rem;
+  font-size: 0.8rem;
+  color: #095F80;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.controls input[type="range"] {
+  width: 80px;
+}
+.controls span {
+  font-size: 0.8rem;
+  color: #ccc;
+  white-space: nowrap;
+}
+.autoplay-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #ccc;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+.autoplay-label input[type="checkbox"] {
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+#now-playing {
+  font-size: 0.8rem;
+  color: #095F80;
+  word-break: break-word;
+  display: inline-block;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* project grid */
+.project-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.project-card {
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  color: inherit;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.project-card:hover {
+  border-color: #095F80;
+}
+.project-card .image-container,
+.project-card .default-hero {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+.project-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.project-card .default-hero {
+  background: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 3rem;
+}
+.project-card .card-content {
+  padding: 0.8rem 1rem;
+  flex: 1;
+}
+.project-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.project-card .summary {
+  margin: 0.4rem 0;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+.project-card .status {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* playlist sidebar layout for music/videos */
+.page-with-sidebar {
+  display: flex;
+  gap: 1rem;
+}
+
+/* admin membership manage panel */
+.membership-panel {
+  background: #111;
+  border: 1px solid #333;
+  padding: 0.5rem;
+  margin-left: 1rem;
+}
+.toggle-membership {
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background: none;
+  border: 1px solid #095F80;
+  color: #095F80;
+  padding: 0.2rem 0.4rem;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  transition: background 0.15s, color 0.15s;
+}
+.toggle-membership:hover {
+  background: #095F80;
+  color: #fff;
+}
+/* ensure the main content area grows, preventing the sidebar from forcing a narrow single column grid */
+.page-with-sidebar .music-grid,
+.page-with-sidebar .gallery-grid {
+  flex: 1;
+  min-width: 0; /* prevent flex overflow and allow grid to wrap correctly */
+}
+.page-with-sidebar .project-list,
+.page-with-sidebar .projects-main {
+  flex: 1;
+  min-width: 0;
+}
+.page-with-sidebar .gallery-main {
+  flex: 1;
+}
+
+.playlist-panel {
+  flex: 0 0 200px;
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  padding: 1rem;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.playlist-panel h3 {
+  margin-top: 0;
+  font-size: 1rem;
+  color: #095F80;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 700;
+}
+.playlist-item {
+  margin-bottom: 1rem;
+}
+.playlist-item .playlist-header {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.playlist-item .playlist-title {
+  font-weight: bold;
+  color: #ccc;
+}
+.playlist-item .playlist-count {
+  font-size: 0.85rem;
+  color: #888;
+  margin-left: 0.4rem;
+}
+.playlist-item .expand-indicator {
+  font-size: 0.9rem;
+  color: #095F80;
+  margin-left: 0.5rem;
+  transition: transform 0.2s;
+}
+.playlist-item .playlist-tracks {
+  list-style: none;
+  padding-left: 1rem;
+  margin-top: 0.3rem;
+  display: none;
+}
+.playlist-item.expanded .playlist-tracks {
+  display: block;
+}
+.playlist-item.expanded .expand-indicator {
+  transform: rotate(90deg);
+}
+.playlist-item li {
+  font-size: 0.85rem;
+  color: #ccc;
+}
+.playlist-item ul {
+  list-style: none;
+  padding-left: 1rem;
+  margin-top: 0.3rem;
+  margin-bottom: 0;
+}
+.playlist-description {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0.3rem 0;
+  font-style: italic;
+}
+
+/* active track highlight */
+.music-card.active {
+  border-color: #095F80;
+  background: rgba(9, 95, 128, 0.15);
+  box-shadow: inset 0 0 8px rgba(9, 95, 128, 0.2);
+}
+
+/* video grid - YouTube style */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  position: relative;
+  padding-bottom: 100px;
+}
+.video-card {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.video-card:hover {
+  transform: scale(1.02);
+}
+.video-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 0.5rem;
+  border: 1px solid #333;
+  transition: border-color 0.2s;
+}
+.default-thumbnail {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #222;
+  border: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s;
+}
+.video-card:hover .default-thumbnail {
+  border-color: #095F80;
+}
+.default-thumbnail i {
+  opacity: 0.7;
+}
+.video-card:hover img {
+  border-color: #095F80;
+}
+.video-card h3 {
+  font-size: 0.95rem;
+  margin: 0.5rem 0;
+  color: #095F80;
+}
+.video-card p {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0.2rem 0;
+}
+.video-card .meta {
+  font-size: 0.8rem;
+  color: #666;
+}
+.embed-container {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+}
+.embed-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.video-detail-player {
+  max-width: 900px;
+  margin: 0 auto 2rem;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border: 1px solid #333;
+}
+.video-detail-player video,
+.video-detail-player iframe {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.custom-video {
+  border: 1px solid #333;
+}
+.video-container {
+  position: relative;
+}
+.video-controls {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  background: #111;
+  padding: 0.4rem;
+  border: 1px solid #333;
+  flex-wrap: wrap;
+}
+.video-controls button {
+  padding: 0.3rem 0.6rem;
+  background: #095F80;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.video-controls button:hover {
+  background: #0a7a9e;
+}
+.video-controls input[type="range"] {
+  width: 100px;
+}
+/* gallery */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
+  gap: 1rem;
+}
+.gallery-item {
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.gallery-item:hover {
+  border-color: #095F80;
+}
+.gallery-item a {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1/1;
+  overflow: hidden;
+}
+.gallery-item a img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gallery-item h3,
+.gallery-item p {
+  padding: 0.4rem 0.6rem;
+  color: #ccc;
+  font-size: 0.9rem;
+  text-align: left;
+}
+.gallery-item h3 {
+  margin-top: 0.5rem;
+}
+.gallery-item p {
+  margin-bottom: 0.5rem;
+  color: #888;
+  font-size: 0.8rem;
+}
+
+/* lightbox/modal for gallery images */
+.lightbox {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  box-shadow: 0 0 20px rgba(9, 95, 128, 0.4);
+  border: 1px solid #095F80;
+}
+
+/* reuse playlist-panel styles for collections sidebar */
+.playlist-panel .playlist-link {
+  display: block;
+  color: #ccc;
+  text-decoration: none;
+  padding: 0.2rem 0;
+  transition: color 0.15s;
+}
+.playlist-panel .playlist-link.active {
+  color: #095F80;
+  font-weight: bold;
+}
+/* projects listing */
+.project-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  position: relative;
+  padding-bottom: 100px;
+}
+.project-card {
+  background: #111;
+  border: 1px solid #333;
+  overflow: hidden;
+  transition: all 0.2s;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.project-card:hover {
+  border-color: #0ff;
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 255, 255, 0.15);
+}
+.project-card .card-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+  background: #000;
+}
+.default-hero {
+  width: 100%;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #222;
+  color: #888;
+  font-size: 3rem;
+}
+.default-hero i {
+  opacity: 0.7;
+}
+.project-card h3 {
+  padding: 0.8rem 1rem 0.4rem;
+  margin: 0;
+}
+.project-card h3 a {
+  color: #095F80;
+  text-decoration: none;
+  display: block;
+  transition: color 0.15s;
+}
+.project-card h3 a:hover {
+  color: #710280;
+}
+.project-card p {
+  padding: 0 1rem 0.8rem;
+  font-size: 0.85rem;
+  margin: 0;
+}
+.project-card .status {
+  color: #095F80;
+  font-weight: bold;
+}
+.collection-info {
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1rem;
+}
+.collection-info h3 {
+  margin: 0 0 0.4rem;
+  color: #095F80;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 700;
+}
+.collection-info p {
+  margin: 0 0 0.3rem;
+  color: #bbb;
+}
+.collection-info span {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+@media (max-width: 900px) {
+  .page-with-sidebar {
+    flex-direction: column;
+  }
+
+  .playlist-panel {
+    flex: none;
+    max-height: none;
+    width: 100%;
+  }
+}
+
+.project-detail .hero {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1rem 0;
+}
+/* search form */
+.search-form {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+.search-form input,
+.search-form select {
+  padding: 0.4rem;
+  background: rgba(34, 34, 34, 0.95);
+  border: 1px solid #444;
+  color: #eee;
+  width: 200px;
+  margin-right: 0.4rem;
+}
+.search-form select {
+  width: auto;
+}
+.search-form button {
+  padding: 0.4rem 0.8rem;
+  background: #095F80;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  margin-left: 0.4rem;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.search-form button:hover {
+  background: #0a7a9e;
+}
+
+/* admin forms */
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.admin-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+.admin-form input,
+.admin-form textarea,
+.admin-form select {
+  padding: 0.4rem;
+  background: rgba(34, 34, 34, 0.95);
+  border: 1px solid #444;
+  color: #eee;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+.admin-form button {
+  padding: 0.6rem 1rem;
+  background: #095F80;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.admin-form button:hover {
+  background: #0a7a9e;
+}
+.admin-list {
+  list-style: none;
+}
+.admin-list li {
+  margin-bottom: 1.5rem;
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  padding: 1rem;
+  border-radius: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.admin-list li .item-title {
+  flex: 1 1 auto;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 600;
+}
+.admin-list li form.link-button {
+  display: inline-block;
+}
+.admin-list li .membership-panel {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+.updates-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.update-card {
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  padding: 1rem;
+  border-radius: 4px;
+}
+.update-header {
+  margin-bottom: 0.5rem;
+}
+.update-timestamp {
+  font-size: 0.85rem;
+  color: #095F80;
+  font-weight: bold;
+}
+.update-content {
+  line-height: 1.5;
+  color: #ccc;
+  margin-bottom: 0.8rem;
+}
+.update-attachments {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #333;
+}
+.attachment-item {
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
+}
+.update-attachments a {
+  color: #095F80;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.update-attachments a:hover {
+  color: #710280;
+  text-decoration: underline;
+}
+.update-actions {
+  margin-top: 0.8rem;
+  text-align: right;
+}
+.link-button {
+  background: none;
+  border: none;
+  color: #095F80;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  transition: color 0.15s;
+}
+.link-button:hover {
+  color: #710280;
+}
+.flash {
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+.flash-success {
+  background: rgba(113, 2, 128, 0.3);
+  color: #c0f0d0;
+  border: 1px solid #710280;
+}
+.flash-error {
+  background: rgba(200, 50, 50, 0.3);
+  color: #ffcccc;
+  border: 1px solid #c83232;
+}
+/* lightbox duplicate - consolidated above */
+@media (max-width: 600px) {
+  .search-form input,
+  .search-form select {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 0.4rem;
+  }
+}
