@@ -1,0 +1,58 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin" class="back-link">&larr; Back to dashboard</a>
+<h2>Homepage Links</h2>
+
+<div class="admin-split-layout">
+  <section class="admin-section-card">
+    <h3>Create New Link</h3>
+    <form action="/admin/homepage-links" method="post" class="admin-form">
+      <%- include('../../partials/csrf-field') %>
+      <label>Title: <input type="text" name="title" required></label>
+      <label>URL: <input type="url" name="url" placeholder="https://example.com" required></label>
+      <label>Section:
+        <select name="section" required>
+          <% sections.forEach((section) => { %>
+            <option value="<%= section.value %>"><%= section.label %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>Description: <textarea name="description"></textarea></label>
+      <label>Order Index: <input type="number" name="order_index" placeholder="Optional"></label>
+      <p class="admin-section-note">Lower order values appear first. Leave blank to place links after explicitly ordered items.</p>
+      <button type="submit">Create Link</button>
+    </form>
+  </section>
+
+  <section class="admin-section-card">
+    <h3>Existing Links</h3>
+    <% if (links && links.length) { %>
+      <ul class="admin-homepage-link-list">
+        <% links.forEach((link) => { %>
+          <li class="admin-homepage-link-item">
+            <strong><%= link.title %></strong>
+            <a href="<%= link.url %>" class="admin-homepage-link-item__url"><%= link.url %></a>
+            <div class="admin-homepage-link-item__meta">
+              <span>Section: <%= sectionLabels[link.section] || link.section %></span>
+              <span>Order: <%= link.order_index == null ? 'Auto' : link.order_index %></span>
+            </div>
+            <% if (link.description) { %>
+              <p class="admin-homepage-link-item__description"><%= link.description %></p>
+            <% } %>
+            <div class="admin-homepage-link-item__actions">
+              <a href="/admin/homepage-links/<%= link.id %>/edit">edit</a> |
+              <form action="/admin/homepage-links/<%= link.id %>?_method=DELETE" method="post" style="display:inline;">
+                <%- include('../../partials/csrf-field') %>
+                <button type="submit" class="link-button">delete</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p>No homepage links yet.</p>
+    <% } %>
+  </section>
+</div>
+
+<%- include('../../partials/footer') %>

@@ -2,8 +2,30 @@ const express = require('express');
 const router = express.Router();
 
 // home
-router.get('/', (req, res) => {
-  res.render('home');
+router.get('/', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const rows = await db.all(
+      `SELECT *
+       FROM homepage_links
+       ORDER BY section, COALESCE(order_index, 999999), title, id`
+    );
+
+    const homepageLinks = {
+      socials: rows.filter((row) => row.section === 'socials'),
+      other: rows.filter((row) => row.section === 'other'),
+    };
+
+    res.render('home', { homepageLinks });
+  } catch (err) {
+    console.error('Home route error:', err);
+    res.render('home', {
+      homepageLinks: {
+        socials: [],
+        other: [],
+      },
+    });
+  }
 });
 
 router.get('/music', async (req, res) => {

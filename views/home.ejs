@@ -30,4 +30,55 @@
     <a href="/projects" class="btn">Enter</a>
   </div>
 </section>
+<%
+  const homepageLinkGroups = homepageLinks || { socials: [], other: [] };
+  const socialLinks = homepageLinkGroups.socials || [];
+  const otherLinks = homepageLinkGroups.other || [];
+  const hasHomepageLinks = socialLinks.length || otherLinks.length;
+%>
+<% if (hasHomepageLinks) { %>
+  <section class="homepage-link-sections" aria-label="Featured links">
+    <% if (socialLinks.length) { %>
+      <section class="homepage-link-section">
+        <div class="homepage-link-section__header">
+          <p class="homepage-link-section__eyebrow">Section</p>
+          <h3>Socials</h3>
+        </div>
+        <div class="homepage-link-list">
+          <% socialLinks.forEach((link) => { %>
+            <div class="homepage-link-card">
+              <a href="<%= link.url %>" class="homepage-link-card__link">
+                <span class="homepage-link-card__title"><%= link.title %></span>
+              </a>
+              <% if (link.description) { %>
+                <span class="homepage-link-card__description"><%= link.description %></span>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+    <% } %>
+
+    <% if (otherLinks.length) { %>
+      <section class="homepage-link-section">
+        <div class="homepage-link-section__header">
+          <p class="homepage-link-section__eyebrow">Section</p>
+          <h3>Other Links</h3>
+        </div>
+        <div class="homepage-link-list">
+          <% otherLinks.forEach((link) => { %>
+            <div class="homepage-link-card">
+              <a href="<%= link.url %>" class="homepage-link-card__link">
+                <span class="homepage-link-card__title"><%= link.title %></span>
+              </a>
+              <% if (link.description) { %>
+                <span class="homepage-link-card__description"><%= link.description %></span>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+    <% } %>
+  </section>
+<% } %>
 <%- include('partials/footer') %>

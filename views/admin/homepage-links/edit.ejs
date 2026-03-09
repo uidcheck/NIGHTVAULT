@@ -1,0 +1,23 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin/homepage-links" class="back-link">&larr; Back to homepage links</a>
+<h2>Edit Homepage Link</h2>
+
+<form action="/admin/homepage-links/<%= link.id %>?_method=PUT" method="post" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
+  <label>Title: <input type="text" name="title" value="<%= link.title %>" required></label>
+  <label>URL: <input type="url" name="url" value="<%= link.url %>" required></label>
+  <label>Section:
+    <select name="section" required>
+      <% sections.forEach((section) => { %>
+        <option value="<%= section.value %>" <%= link.section === section.value ? 'selected' : '' %>><%= section.label %></option>
+      <% }) %>
+    </select>
+  </label>
+  <label>Description: <textarea name="description"><%= link.description || '' %></textarea></label>
+  <label>Order Index: <input type="number" name="order_index" value="<%= link.order_index == null ? '' : link.order_index %>"></label>
+  <p class="admin-section-note">Lower order values appear first. Leave blank to place this link after explicitly ordered items.</p>
+  <button type="submit">Update Link</button>
+</form>
+
+<%- include('../../partials/footer') %>

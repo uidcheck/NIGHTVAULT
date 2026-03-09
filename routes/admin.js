@@ -21,6 +21,10 @@ const WAV_MIME_TYPES = new Set([
   'audio/x-wav',
   'audio/vnd.wave',
 ]);
+const HOMEPAGE_LINK_SECTIONS = {
+  socials: 'Socials',
+  other: 'Other Links',
+};
 
 // ============================================================================
 // FILE DELETION HELPERS
@@ -519,6 +523,39 @@ function buildBulkDeleteMessage(result, singularLabel, pluralLabel) {
   return parts.join('. ');
 }
 
+function getHomepageLinkSections() {
+  return Object.entries(HOMEPAGE_LINK_SECTIONS).map(([value, label]) => ({ value, label }));
+}
+
+function isValidHomepageLinkSection(section) {
+  return Object.prototype.hasOwnProperty.call(HOMEPAGE_LINK_SECTIONS, section);
+}
+
+function normalizeHomepageLinkInput(body = {}) {
+  return {
+    title: (body.title || '').trim(),
+    url: (body.url || '').trim(),
+    section: (body.section || '').trim(),
+    description: (body.description || '').trim(),
+    orderIndex: (body.order_index || '').toString().trim(),
+  };
+}
+
+function parseHomepageLinkOrderIndex(rawOrderIndex) {
+  if (!rawOrderIndex) return null;
+  const parsed = parseInt(rawOrderIndex, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function isValidHomepageLinkUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol);
+  } catch (err) {
+    return false;
+  }
+}
+
 function isAjaxRequest(req) {
   const requestedWith = (req.get('X-Requested-With') || '').toLowerCase();
   const accept = (req.get('Accept') || '').toLowerCase();
@@ -568,7 +605,149 @@ router.get('/', async (req, res) => {
   counts.videos = (await db.get('SELECT COUNT(*) as c FROM videos')).c;
   counts.gallery = (await db.get('SELECT COUNT(*) as c FROM gallery')).c;
   counts.projects = (await db.get('SELECT COUNT(*) as c FROM projects')).c;
+  counts.homepageLinks = (await db.get('SELECT COUNT(*) as c FROM homepage_links')).c;
   res.render('admin/dashboard', { counts });
+});
+
+router.get('/homepage-links', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const links = await db.all(
+      `SELECT *
+       FROM homepage_links
+       ORDER BY section, COALESCE(order_index, 999999), title, id`
+    );
+
+    return res.render('admin/homepage-links/index', {
+      links,
+      sections: getHomepageLinkSections(),
+      sectionLabels: HOMEPAGE_LINK_SECTIONS,
+    });
+  } catch (err) {
+    console.error('Homepage links load error:', err);
+    req.flash('error', 'Failed to load homepage links.');
+    return res.render('admin/homepage-links/index', {
+      links: [],
+      sections: getHomepageLinkSections(),
+      sectionLabels: HOMEPAGE_LINK_SECTIONS,
+    });
+  }
+});
+
+router.post('/homepage-links', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const payload = normalizeHomepageLinkInput(req.body);
+
+    if (!payload.title) {
+      req.flash('error', 'Link title is required.');
+      return res.redirect('/admin/homepage-links');
+    }
+
+    if (!payload.url || !isValidHomepageLinkUrl(payload.url)) {
+      req.flash('error', 'Enter a valid link URL using http, https, mailto, or tel.');
+      return res.redirect('/admin/homepage-links');
+    }
+
+    if (!isValidHomepageLinkSection(payload.section)) {
+      req.flash('error', 'Choose a valid homepage section.');
+      return res.redirect('/admin/homepage-links');
+    }
+
+    await db.run(
+      'INSERT INTO homepage_links (title, url, section, description, order_index) VALUES (?,?,?,?,?)',
+      payload.title,
+      payload.url,
+      payload.section,
+      payload.description || null,
+      parseHomepageLinkOrderIndex(payload.orderIndex)
+    );
+
+    req.flash('success', 'Homepage link created.');
+    return res.redirect('/admin/homepage-links');
+  } catch (err) {
+    console.error('Homepage link creation error:', err);
+    req.flash('error', 'Failed to create homepage link.');
+    return res.redirect('/admin/homepage-links');
+  }
+});
+
+router.get('/homepage-links/:id/edit', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const link = await db.get('SELECT * FROM homepage_links WHERE id = ?', req.params.id);
+    if (!link) {
+      req.flash('error', 'Homepage link not found.');
+      return res.redirect('/admin/homepage-links');
+    }
+
+    return res.render('admin/homepage-links/edit', {
+      link,
+      sections: getHomepageLinkSections(),
+    });
+  } catch (err) {
+    console.error('Homepage link edit load error:', err);
+    req.flash('error', 'Failed to load homepage link.');
+    return res.redirect('/admin/homepage-links');
+  }
+});
+
+router.put('/homepage-links/:id', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const payload = normalizeHomepageLinkInput(req.body);
+    const link = await db.get('SELECT id FROM homepage_links WHERE id = ?', req.params.id);
+
+    if (!link) {
+      req.flash('error', 'Homepage link not found.');
+      return res.redirect('/admin/homepage-links');
+    }
+
+    if (!payload.title) {
+      req.flash('error', 'Link title is required.');
+      return res.redirect(`/admin/homepage-links/${req.params.id}/edit`);
+    }
+
+    if (!payload.url || !isValidHomepageLinkUrl(payload.url)) {
+      req.flash('error', 'Enter a valid link URL using http, https, mailto, or tel.');
+      return res.redirect(`/admin/homepage-links/${req.params.id}/edit`);
+    }
+
+    if (!isValidHomepageLinkSection(payload.section)) {
+      req.flash('error', 'Choose a valid homepage section.');
+      return res.redirect(`/admin/homepage-links/${req.params.id}/edit`);
+    }
+
+    await db.run(
+      'UPDATE homepage_links SET title = ?, url = ?, section = ?, description = ?, order_index = ? WHERE id = ?',
+      payload.title,
+      payload.url,
+      payload.section,
+      payload.description || null,
+      parseHomepageLinkOrderIndex(payload.orderIndex),
+      req.params.id
+    );
+
+    req.flash('success', 'Homepage link updated.');
+    return res.redirect('/admin/homepage-links');
+  } catch (err) {
+    console.error('Homepage link update error:', err);
+    req.flash('error', 'Failed to update homepage link.');
+    return res.redirect(`/admin/homepage-links/${req.params.id}/edit`);
+  }
+});
+
+router.delete('/homepage-links/:id', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    await db.run('DELETE FROM homepage_links WHERE id = ?', req.params.id);
+    req.flash('success', 'Homepage link deleted.');
+    return res.redirect('/admin/homepage-links');
+  } catch (err) {
+    console.error('Homepage link deletion error:', err);
+    req.flash('error', 'Failed to delete homepage link.');
+    return res.redirect('/admin/homepage-links');
+  }
 });
 
 // music management
