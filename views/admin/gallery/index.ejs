@@ -4,17 +4,35 @@
 <h2>Gallery Management</h2>
 <a href="/admin/gallery/new" class="btn">Upload Image</a>
 <% if (images && images.length) { %>
-  <ul class="admin-list">
+  <section class="admin-bulk-root" data-bulk-select-root data-bulk-label-singular="image" data-bulk-label-plural="images">
+    <div class="admin-bulk-toolbar">
+      <div class="admin-bulk-toolbar-actions">
+        <button type="button" class="btn" data-bulk-select-start>Select Images</button>
+        <button type="button" class="btn" data-bulk-select-stop hidden>Stop Selecting</button>
+      </div>
+      <form id="gallery-bulk-delete-form" action="/admin/gallery/bulk-delete" method="post" class="admin-bulk-delete-form" data-bulk-delete-form hidden>
+        <%- include('../../partials/csrf-field') %>
+        <button type="submit" class="btn admin-bulk-delete-btn" data-bulk-delete-button disabled>Delete Selected</button>
+        <span class="admin-bulk-selection-count" data-bulk-selection-count>0 images selected</span>
+      </form>
+    </div>
+    <ul class="admin-list">
     <% images.forEach(img => { %>
-      <li>
+      <li data-bulk-select-item>
+        <label class="bulk-select-checkbox-wrap">
+          <input type="checkbox" name="selected_ids" value="<%= img.id %>" data-bulk-select-checkbox form="gallery-bulk-delete-form">
+          <span>Select</span>
+        </label>
         <span class="item-title"><%= img.title || img.filename %></span>
         <% const count = imageCollections[img.id] ? imageCollections[img.id].length : 0; %>
-        <button type="button" class="toggle-membership">Collections (<%= count %>)</button>
-        <a href="/admin/gallery/<%= img.id %>/edit">edit</a> |
-        <form action="/admin/gallery/<%= img.id %>?_method=DELETE" method="post" style="display:inline;">
-          <%- include('../../partials/csrf-field') %>
-          <button type="submit" class="link-button">delete</button>
-        </form>
+        <div class="admin-item-actions">
+          <button type="button" class="toggle-membership">Collections (<%= count %>)</button>
+          <a href="/admin/gallery/<%= img.id %>/edit">edit</a> |
+          <form action="/admin/gallery/<%= img.id %>?_method=DELETE" method="post" style="display:inline;">
+            <%- include('../../partials/csrf-field') %>
+            <button type="submit" class="link-button">delete</button>
+          </form>
+        </div>
         <div class="membership-panel" style="display:none;">
           <form method="post" action="/admin/gallery/<%= img.id %>/collections">
             <%- include('../../partials/csrf-field') %>
@@ -30,7 +48,8 @@
         </div>
       </li>
     <% }) %>
-  </ul>
+    </ul>
+  </section>
 <% } else { %>
   <p>No images yet.</p>
 <% } %>

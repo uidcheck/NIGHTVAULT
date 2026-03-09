@@ -11,6 +11,7 @@ PARACAUSAL is a personal creative archive for music, videos, gallery work, and p
   - videos and thumbnails
   - gallery images
   - projects, project hero images, documents, and updates
+- WAV music uploads are automatically converted to MP3 for faster web playback
 - Playlists for music and videos
 - Collections for gallery items and projects
 - Global and section-based search/filtering
@@ -231,7 +232,7 @@ Use:
 
 Uploaded files are stored under `uploads/`:
 
-- `uploads/music/` — music/audio files and cover images
+- `uploads/music/` — music playback files and cover images. WAV/WAVE uploads are converted to MP3 automatically and the converted MP3 is stored for playback.
 - `uploads/videos/` — video files and thumbnails
 - `uploads/images/` — gallery images
 - `uploads/projects/` — project hero images

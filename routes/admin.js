@@ -13,6 +13,15 @@ const { ensureArchiveVariant, deleteArchiveVariant } = require('../utils/image-v
 // set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
+const MUSIC_UPLOAD_DIR = path.join(__dirname, '..', 'uploads', 'music');
+const WAV_EXTENSIONS = new Set(['.wav', '.wave']);
+const WAV_MIME_TYPES = new Set([
+  'audio/wav',
+  'audio/wave',
+  'audio/x-wav',
+  'audio/vnd.wave',
+]);
+
 // ============================================================================
 // FILE DELETION HELPERS
 // ============================================================================
@@ -175,6 +184,93 @@ const generateVideoThumbnail = (videoPath, outputPath) => {
       .on('end', () => resolve(path.basename(outputPath)));;
   });
 };
+
+const convertAudioToMp3 = (inputPath, outputPath) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .audioCodec('libmp3lame')
+      .audioBitrate('192k')
+      .format('mp3')
+      .on('error', reject)
+      .on('end', () => resolve(path.basename(outputPath)))
+      .save(outputPath);
+  });
+};
+
+function isWavUpload(file) {
+  if (!file) return false;
+
+  const extension = path.extname(file.originalname || file.filename || '').toLowerCase();
+  const mimeType = (file.mimetype || '').toLowerCase();
+
+  return WAV_EXTENSIONS.has(extension) || WAV_MIME_TYPES.has(mimeType);
+}
+
+async function prepareMusicUploadForPlayback(file, options = {}) {
+  if (!file) {
+    return {
+      metadata: {
+        title: '',
+        artist: '',
+        album: '',
+        year: '',
+        track: null,
+      },
+      extractedCoverFilename: null,
+      hasEmbeddedCover: false,
+      playbackFilename: '',
+      convertedToMp3: false,
+    };
+  }
+
+  const { extractCover = false } = options;
+  const sourcePath = path.join(MUSIC_UPLOAD_DIR, file.filename);
+  const transcodedFilename = `${path.parse(file.filename).name}.transcoded.mp3`;
+  const transcodedPath = path.join(MUSIC_UPLOAD_DIR, transcodedFilename);
+  const shouldConvert = isWavUpload(file);
+  let parsed = {
+    metadata: {
+      title: '',
+      artist: '',
+      album: '',
+      year: '',
+      track: null,
+    },
+    extractedCoverFilename: null,
+    hasEmbeddedCover: false,
+  };
+
+  try {
+    parsed = await parseMusicUploadFromFile(sourcePath, file.originalname, {
+      extractCover,
+      coverOutputDir: MUSIC_UPLOAD_DIR,
+    });
+  } catch (err) {
+    console.log('Music metadata extraction failed for', file.originalname, err.message);
+  }
+
+  if (shouldConvert) {
+    try {
+      await convertAudioToMp3(sourcePath, transcodedPath);
+      await safeDeleteFile(sourcePath);
+    } catch (err) {
+      if (parsed.extractedCoverFilename) {
+        await deleteUploadedFile(parsed.extractedCoverFilename, 'music');
+      }
+      await safeDeleteFile(sourcePath);
+      await safeDeleteFile(transcodedPath);
+      throw new Error(`Failed to convert ${file.originalname} to MP3: ${err.message}`);
+    }
+  }
+
+  return {
+    metadata: parsed.metadata,
+    extractedCoverFilename: parsed.extractedCoverFilename,
+    hasEmbeddedCover: parsed.hasEmbeddedCover,
+    playbackFilename: shouldConvert ? transcodedFilename : file.filename,
+    convertedToMp3: shouldConvert,
+  };
+}
 
 // configure multer storage for different types
 const musicStorage = multer.diskStorage({
@@ -342,6 +438,87 @@ async function assignTrackToPlaylist(db, playlistId, musicId, preferredOrder = n
   );
 }
 
+function normalizeSelectedIds(rawIds) {
+  const values = Array.isArray(rawIds) ? rawIds : [rawIds];
+  return [...new Set(values
+    .map((value) => parseInt(value, 10))
+    .filter((value) => !Number.isNaN(value) && value > 0))];
+}
+
+async function deleteMusicRecord(db, musicId) {
+  const track = await db.get('SELECT id FROM music WHERE id = ?', musicId);
+  if (!track) return false;
+
+  await deleteMusicFiles(db, musicId);
+  await db.run('DELETE FROM music WHERE id = ?', musicId);
+  return true;
+}
+
+async function deleteVideoRecord(db, videoId) {
+  const video = await db.get('SELECT id FROM videos WHERE id = ?', videoId);
+  if (!video) return false;
+
+  await deleteVideoFiles(db, videoId);
+  await db.run('DELETE FROM videos WHERE id = ?', videoId);
+  return true;
+}
+
+async function deleteGalleryRecord(db, galleryId) {
+  const galleryItem = await db.get('SELECT id FROM gallery WHERE id = ?', galleryId);
+  if (!galleryItem) return false;
+
+  await deleteGalleryFiles(db, galleryId);
+  await db.run('DELETE FROM gallery WHERE id = ?', galleryId);
+  return true;
+}
+
+async function deleteProjectRecord(db, projectId) {
+  const project = await db.get('SELECT id FROM projects WHERE id = ?', projectId);
+  if (!project) return false;
+
+  await deleteProjectFiles(db, projectId);
+  await db.run('DELETE FROM projects WHERE id = ?', projectId);
+  return true;
+}
+
+async function bulkDeleteRecords(ids, deleteRecord) {
+  let deleted = 0;
+  let failed = 0;
+  let missing = 0;
+
+  for (const id of ids) {
+    try {
+      const removed = await deleteRecord(id);
+      if (removed) {
+        deleted += 1;
+      } else {
+        missing += 1;
+      }
+    } catch (err) {
+      failed += 1;
+      console.error(`Bulk delete failed for record ${id}:`, err);
+    }
+  }
+
+  return { deleted, failed, missing };
+}
+
+function buildBulkDeleteMessage(result, singularLabel, pluralLabel) {
+  const parts = [];
+
+  if (result.deleted > 0) {
+    parts.push(`Deleted ${result.deleted} ${result.deleted === 1 ? singularLabel : pluralLabel}`);
+  }
+  if (result.missing > 0) {
+    parts.push(`${result.missing} already missing`);
+  }
+  if (result.failed > 0) {
+    parts.push(`${result.failed} failed`);
+  }
+
+  return parts.join('. ');
+}
+
 
 // dashboard overview
 router.get('/', async (req, res) => {
@@ -404,60 +581,79 @@ router.post('/music/metadata-preview', uploadMusicPreview.single('file'), valida
 router.post('/music', uploadMusicFields, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { title, artist, album, year, description, order_index, playlist_id, new_playlist_title } = req.body;
-  const filename = req.files && req.files.file ? req.files.file[0].filename : '';
   const audioFile = req.files && req.files.file ? req.files.file[0] : null;
   const manualCover = req.files && req.files.cover ? req.files.cover[0] : null;
 
-  let extractedMetadata = {
-    title: '',
-    artist: '',
-    album: '',
-    year: '',
-    track: null,
-  };
+  let preparedUpload = null;
   let cover = manualCover ? manualCover.filename : '';
 
-  if (audioFile) {
-    try {
-      const parsed = await parseMusicUploadFromFile(path.join('uploads', 'music', audioFile.filename), audioFile.originalname, {
-        extractCover: !manualCover,
-      });
-      extractedMetadata = parsed.metadata;
-      if (!manualCover && parsed.extractedCoverFilename) {
-        cover = parsed.extractedCoverFilename;
-      }
-    } catch (err) {
-      console.log('Metadata extraction failed for single upload', audioFile.originalname, err.message);
+  try {
+    preparedUpload = await prepareMusicUploadForPlayback(audioFile, {
+      extractCover: !manualCover,
+    });
+
+    if (!manualCover && preparedUpload.extractedCoverFilename) {
+      cover = preparedUpload.extractedCoverFilename;
     }
+
+    if (cover) {
+      await ensureArchiveVariant('music', cover);
+    }
+
+    const finalTitle = (title || '').trim() || preparedUpload.metadata.title || (audioFile ? path.parse(audioFile.originalname).name : '');
+    const finalArtist = (artist || '').trim() || preparedUpload.metadata.artist || null;
+    const finalAlbum = (album || '').trim() || preparedUpload.metadata.album || null;
+    const finalYear = (year || '').toString().trim() || preparedUpload.metadata.year || null;
+    const finalOrderIndex = (order_index || '').toString().trim() || preparedUpload.metadata.track || null;
+
+    await db.exec('BEGIN TRANSACTION');
+    try {
+      let targetPlaylistId = (playlist_id || '').trim();
+      if (new_playlist_title && new_playlist_title.trim()) {
+        targetPlaylistId = await createMusicPlaylist(db, new_playlist_title, description || null);
+      }
+
+      const result = await db.run(
+        'INSERT INTO music (title, artist, album, year, description, filename, cover_image, order_index) VALUES (?,?,?,?,?,?,?,?)',
+        finalTitle,
+        finalArtist,
+        finalAlbum,
+        finalYear,
+        description,
+        preparedUpload.playbackFilename,
+        cover,
+        finalOrderIndex
+      );
+      const musicId = result.lastID;
+
+      if (musicId && targetPlaylistId) {
+        await assignTrackToPlaylist(db, targetPlaylistId, musicId, preparedUpload.metadata.track || null);
+      }
+
+      await db.exec('COMMIT');
+    } catch (txErr) {
+      await db.exec('ROLLBACK');
+      throw txErr;
+    }
+
+    req.flash('success', preparedUpload.convertedToMp3 ? 'Music uploaded and converted to MP3 for faster playback' : 'Music uploaded');
+    res.redirect('/admin/music');
+  } catch (err) {
+    console.error('Single music upload error:', err);
+    if (manualCover) {
+      await deleteUploadedFile(manualCover.filename, 'music');
+    }
+    if (preparedUpload && preparedUpload.playbackFilename) {
+      await deleteUploadedFile(preparedUpload.playbackFilename, 'music');
+    } else if (audioFile && audioFile.filename) {
+      await safeDeleteFile(path.join(MUSIC_UPLOAD_DIR, audioFile.filename));
+    }
+    if (preparedUpload && preparedUpload.extractedCoverFilename && preparedUpload.extractedCoverFilename !== cover) {
+      await deleteUploadedFile(preparedUpload.extractedCoverFilename, 'music');
+    }
+    req.flash('error', `Failed to upload music: ${err.message || 'Unknown error'}`);
+    res.redirect('/admin/music/new');
   }
-
-  if (cover) {
-    await ensureArchiveVariant('music', cover);
-  }
-
-  const finalTitle = (title || '').trim() || extractedMetadata.title || (audioFile ? path.parse(audioFile.originalname).name : '');
-  const finalArtist = (artist || '').trim() || extractedMetadata.artist || null;
-  const finalAlbum = (album || '').trim() || extractedMetadata.album || null;
-  const finalYear = (year || '').toString().trim() || extractedMetadata.year || null;
-  const finalOrderIndex = (order_index || '').toString().trim() || extractedMetadata.track || null;
-
-  const result = await db.run(
-    'INSERT INTO music (title, artist, album, year, description, filename, cover_image, order_index) VALUES (?,?,?,?,?,?,?,?)',
-    finalTitle, finalArtist, finalAlbum, finalYear, description, filename, cover, finalOrderIndex
-  );
-  const musicId = result.lastID;
-
-  let targetPlaylistId = (playlist_id || '').trim();
-  if (new_playlist_title && new_playlist_title.trim()) {
-    targetPlaylistId = await createMusicPlaylist(db, new_playlist_title, description || null);
-  }
-
-  if (musicId && targetPlaylistId) {
-    await assignTrackToPlaylist(db, targetPlaylistId, musicId, extractedMetadata.track || null);
-  }
-
-  req.flash('success', 'Music uploaded');
-  res.redirect('/admin/music');
 });
 
 // batch music upload
@@ -474,61 +670,92 @@ router.post('/music/batch', uploadBatchMusic, validateCsrfToken, async (req, res
   const sharedCoverFile = req.files.shared_cover ? req.files.shared_cover[0] : null;
 
   let targetPlaylistId = playlist_id;
-  if (new_playlist_title && new_playlist_title.trim()) {
-    targetPlaylistId = await createMusicPlaylist(db, new_playlist_title, shared_description || null);
-  }
+  const preparedTracks = [];
 
-  const uploadedTracks = [];
-
-  for (const file of files) {
-    const filePath = path.join('uploads/music', file.filename);
-    let metadata = {
-      title: '',
-      artist: '',
-      album: '',
-      year: '',
-      track: null,
-    };
-    let coverFilename = sharedCoverFile ? sharedCoverFile.filename : null;
-
-    try {
-      const parsed = await parseMusicUploadFromFile(filePath, file.originalname, {
-        extractCover: !coverFilename,
+  try {
+    for (const file of files) {
+      const prepared = await prepareMusicUploadForPlayback(file, {
+        extractCover: !sharedCoverFile,
       });
-      metadata = parsed.metadata;
-      if (!coverFilename && parsed.extractedCoverFilename) {
-        coverFilename = parsed.extractedCoverFilename;
+
+      preparedTracks.push({
+        file,
+        prepared,
+        coverFilename: sharedCoverFile ? sharedCoverFile.filename : prepared.extractedCoverFilename,
+      });
+    }
+
+    if (sharedCoverFile) {
+      await ensureArchiveVariant('music', sharedCoverFile.filename);
+    }
+
+    for (const track of preparedTracks) {
+      if (!sharedCoverFile && track.coverFilename) {
+        await ensureArchiveVariant('music', track.coverFilename);
       }
-    } catch (err) {
-      console.log('Metadata extraction failed for', file.originalname, err.message);
     }
 
-    // fallback to filename if no title
-    const title = metadata.title || path.parse(file.originalname).name;
-    const artist = metadata.artist || default_artist || null;
-    const album = metadata.album || default_album || null;
-    const year = metadata.year || default_year || null;
-    const order_index = metadata.track || null;
+    await db.exec('BEGIN TRANSACTION');
+    try {
+      if (new_playlist_title && new_playlist_title.trim()) {
+        targetPlaylistId = await createMusicPlaylist(db, new_playlist_title, shared_description || null);
+      }
 
-    if (coverFilename) {
-      await ensureArchiveVariant('music', coverFilename);
+      for (const track of preparedTracks) {
+        const metadata = track.prepared.metadata;
+        const title = metadata.title || path.parse(track.file.originalname).name;
+        const artist = metadata.artist || default_artist || null;
+        const album = metadata.album || default_album || null;
+        const year = metadata.year || default_year || null;
+        const orderIndex = metadata.track || null;
+
+        const result = await db.run(
+          'INSERT INTO music (title, artist, album, year, filename, cover_image, order_index) VALUES (?,?,?,?,?,?,?)',
+          title,
+          artist,
+          album,
+          year,
+          track.prepared.playbackFilename,
+          track.coverFilename,
+          orderIndex
+        );
+        const musicId = result.lastID;
+
+        if (targetPlaylistId) {
+          await assignTrackToPlaylist(db, targetPlaylistId, musicId, metadata.track || null);
+        }
+      }
+      await db.exec('COMMIT');
+    } catch (txErr) {
+      await db.exec('ROLLBACK');
+      throw txErr;
     }
 
-    const result = await db.run(
-      'INSERT INTO music (title, artist, album, year, filename, cover_image, order_index) VALUES (?,?,?,?,?,?,?)',
-      title, artist, album, year, file.filename, coverFilename, order_index
-    );
-    const musicId = result.lastID;
-    uploadedTracks.push({ id: musicId, title, artist, album, track: metadata.track });
+    const convertedCount = preparedTracks.filter(track => track.prepared.convertedToMp3).length;
+    const successMessage = convertedCount > 0
+      ? `Batch uploaded ${preparedTracks.length} tracks (${convertedCount} WAV file${convertedCount === 1 ? '' : 's'} converted to MP3)`
+      : `Batch uploaded ${preparedTracks.length} tracks`;
 
-    // assign to playlist if selected
-    if (targetPlaylistId) {
-      await assignTrackToPlaylist(db, targetPlaylistId, musicId, metadata.track || null);
+    req.flash('success', successMessage);
+    res.redirect('/admin/music');
+  } catch (err) {
+    console.error('Batch music upload error:', err);
+    for (const track of preparedTracks) {
+      if (track.prepared && track.prepared.playbackFilename) {
+        await deleteUploadedFile(track.prepared.playbackFilename, 'music');
+      } else if (track.file && track.file.filename) {
+        await safeDeleteFile(path.join(MUSIC_UPLOAD_DIR, track.file.filename));
+      }
+      if (!sharedCoverFile && track.prepared && track.prepared.extractedCoverFilename) {
+        await deleteUploadedFile(track.prepared.extractedCoverFilename, 'music');
+      }
     }
+    if (sharedCoverFile) {
+      await deleteUploadedFile(sharedCoverFile.filename, 'music');
+    }
+    req.flash('error', `Batch upload failed: ${err.message || 'Unknown error'}`);
+    res.redirect('/admin/music/batch');
   }
-
-  req.flash('success', `Batch uploaded ${files.length} tracks`);
-  res.redirect('/admin/music');
 });
 
 router.get('/music/:id/edit', async (req, res) => {
@@ -544,52 +771,75 @@ router.get('/music/:id/edit', async (req, res) => {
 router.put('/music/:id', uploadMusicFields, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { title, artist, album, year, description, order_index, playlists } = req.body;
-  const file = req.files && req.files.file ? req.files.file[0].filename : null;
+  const audioFile = req.files && req.files.file ? req.files.file[0] : null;
   const cover = req.files && req.files.cover ? req.files.cover[0].filename : null;
   const track = await db.get('SELECT * FROM music WHERE id = ?', req.params.id);
   const trackId = parseInt(req.params.id, 10);
-  
-  // Delete old files if they're being replaced
-  if (file && track.filename && file !== track.filename) {
-    await deleteUploadedFile(track.filename, 'music');
-  }
-  if (cover && track.cover_image && cover !== track.cover_image) {
-    await deleteMusicCoverIfUnreferenced(db, track.cover_image, trackId);
-  }
-  
-  const filename = file || track.filename;
-  const cover_image = cover || track.cover_image;
-  if (cover) {
-    await ensureArchiveVariant('music', cover_image);
-  }
-  await db.run(
-    'UPDATE music SET title=?, artist=?, album=?, year=?, description=?, filename=?, cover_image=?, order_index=? WHERE id=?',
-    title, artist, album, year, description, filename, cover_image, order_index || null, req.params.id
-  );
-  // update playlists: remove old, then add new selection if any
-  await db.run('DELETE FROM music_playlist_items WHERE music_id = ?', req.params.id);
-  if (playlists) {
-    const arr = Array.isArray(playlists) ? playlists : [playlists];
-    for (const pid of arr) {
-      const maxOrder = await db.get('SELECT MAX(order_index) as max_order FROM music_playlist_items WHERE playlist_id = ?', pid);
-      const nextOrder = (maxOrder.max_order || 0) + 1;
-      await db.run('INSERT INTO music_playlist_items (playlist_id, music_id, order_index) VALUES (?,?,?)', pid, req.params.id, nextOrder);
+
+  let preparedAudio = null;
+
+  try {
+    if (audioFile) {
+      preparedAudio = await prepareMusicUploadForPlayback(audioFile, { extractCover: false });
     }
+
+    const filename = preparedAudio ? preparedAudio.playbackFilename : track.filename;
+    const coverImage = cover || track.cover_image;
+    if (cover) {
+      await ensureArchiveVariant('music', coverImage);
+    }
+
+    await db.exec('BEGIN TRANSACTION');
+    try {
+      await db.run(
+        'UPDATE music SET title=?, artist=?, album=?, year=?, description=?, filename=?, cover_image=?, order_index=? WHERE id=?',
+        title, artist, album, year, description, filename, coverImage, order_index || null, req.params.id
+      );
+
+      await db.run('DELETE FROM music_playlist_items WHERE music_id = ?', req.params.id);
+      if (playlists) {
+        const arr = Array.isArray(playlists) ? playlists : [playlists];
+        for (const pid of arr) {
+          const maxOrder = await db.get('SELECT MAX(order_index) as max_order FROM music_playlist_items WHERE playlist_id = ?', pid);
+          const nextOrder = (maxOrder.max_order || 0) + 1;
+          await db.run('INSERT INTO music_playlist_items (playlist_id, music_id, order_index) VALUES (?,?,?)', pid, req.params.id, nextOrder);
+        }
+      }
+      await db.exec('COMMIT');
+    } catch (txErr) {
+      await db.exec('ROLLBACK');
+      throw txErr;
+    }
+
+    if (preparedAudio && track.filename && filename !== track.filename) {
+      await deleteUploadedFile(track.filename, 'music');
+    }
+    if (cover && track.cover_image && cover !== track.cover_image) {
+      await deleteMusicCoverIfUnreferenced(db, track.cover_image, trackId);
+    }
+
+    req.flash('success', preparedAudio && preparedAudio.convertedToMp3 ? 'Track updated and converted to MP3 for faster playback' : 'Track updated');
+    res.redirect('/admin/music');
+  } catch (err) {
+    console.error('Track update error:', err);
+    if (cover) {
+      await deleteUploadedFile(cover, 'music');
+    }
+    if (preparedAudio && preparedAudio.playbackFilename) {
+      await deleteUploadedFile(preparedAudio.playbackFilename, 'music');
+    } else if (audioFile && audioFile.filename) {
+      await safeDeleteFile(path.join(MUSIC_UPLOAD_DIR, audioFile.filename));
+    }
+    req.flash('error', `Failed to update track: ${err.message || 'Unknown error'}`);
+    res.redirect(`/admin/music/${req.params.id}/edit`);
   }
-  req.flash('success', 'Track updated');
-  res.redirect('/admin/music');
 });
 
 router.delete('/music/:id', async (req, res) => {
   try {
     const db = req.app.locals.db;
     const musicId = parseInt(req.params.id);
-    
-    // Delete associated files first
-    await deleteMusicFiles(db, musicId);
-    
-    // Then delete DB record (cascades to playlist items)
-    await db.run('DELETE FROM music WHERE id = ?', musicId);
+    await deleteMusicRecord(db, musicId);
     
     req.flash('success', 'Track deleted');
     res.redirect('/admin/music');
@@ -597,6 +847,29 @@ router.delete('/music/:id', async (req, res) => {
     console.error('Music deletion error:', err);
     req.flash('error', 'Failed to delete track');
     res.redirect('/admin/music');
+  }
+});
+
+router.post('/music/bulk-delete', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const ids = normalizeSelectedIds(req.body.selected_ids);
+    if (!ids.length) {
+      req.flash('error', 'Select at least one track to delete.');
+      return res.redirect('/admin/music');
+    }
+
+    const result = await bulkDeleteRecords(ids, (musicId) => deleteMusicRecord(db, musicId));
+    if (result.deleted > 0 && result.failed === 0) {
+      req.flash('success', buildBulkDeleteMessage(result, 'track', 'tracks'));
+    } else {
+      req.flash('error', buildBulkDeleteMessage(result, 'track', 'tracks') || 'Failed to delete selected tracks.');
+    }
+    return res.redirect('/admin/music');
+  } catch (err) {
+    console.error('Bulk music deletion error:', err);
+    req.flash('error', 'Failed to delete selected tracks.');
+    return res.redirect('/admin/music');
   }
 });
 
@@ -724,12 +997,7 @@ router.delete('/videos/:id', async (req, res) => {
   try {
     const db = req.app.locals.db;
     const videoId = parseInt(req.params.id);
-    
-    // Delete associated files first
-    await deleteVideoFiles(db, videoId);
-    
-    // Then delete DB record (cascades to playlist items)
-    await db.run('DELETE FROM videos WHERE id = ?', videoId);
+    await deleteVideoRecord(db, videoId);
     
     req.flash('success', 'Video deleted');
     res.redirect('/admin/videos');
@@ -737,6 +1005,29 @@ router.delete('/videos/:id', async (req, res) => {
     console.error('Video deletion error:', err);
     req.flash('error', 'Failed to delete video');
     res.redirect('/admin/videos');
+  }
+});
+
+router.post('/videos/bulk-delete', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const ids = normalizeSelectedIds(req.body.selected_ids);
+    if (!ids.length) {
+      req.flash('error', 'Select at least one video to delete.');
+      return res.redirect('/admin/videos');
+    }
+
+    const result = await bulkDeleteRecords(ids, (videoId) => deleteVideoRecord(db, videoId));
+    if (result.deleted > 0 && result.failed === 0) {
+      req.flash('success', buildBulkDeleteMessage(result, 'video', 'videos'));
+    } else {
+      req.flash('error', buildBulkDeleteMessage(result, 'video', 'videos') || 'Failed to delete selected videos.');
+    }
+    return res.redirect('/admin/videos');
+  } catch (err) {
+    console.error('Bulk video deletion error:', err);
+    req.flash('error', 'Failed to delete selected videos.');
+    return res.redirect('/admin/videos');
   }
 });
 
@@ -831,12 +1122,7 @@ router.delete('/gallery/:id', async (req, res) => {
   try {
     const db = req.app.locals.db;
     const galleryId = parseInt(req.params.id);
-    
-    // Delete associated files first
-    await deleteGalleryFiles(db, galleryId);
-    
-    // Then delete DB record (cascades to collection items)
-    await db.run('DELETE FROM gallery WHERE id = ?', galleryId);
+    await deleteGalleryRecord(db, galleryId);
     
     req.flash('success', 'Image deleted');
     res.redirect('/admin/gallery');
@@ -844,6 +1130,29 @@ router.delete('/gallery/:id', async (req, res) => {
     console.error('Gallery deletion error:', err);
     req.flash('error', 'Failed to delete image');
     res.redirect('/admin/gallery');
+  }
+});
+
+router.post('/gallery/bulk-delete', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const ids = normalizeSelectedIds(req.body.selected_ids);
+    if (!ids.length) {
+      req.flash('error', 'Select at least one image to delete.');
+      return res.redirect('/admin/gallery');
+    }
+
+    const result = await bulkDeleteRecords(ids, (galleryId) => deleteGalleryRecord(db, galleryId));
+    if (result.deleted > 0 && result.failed === 0) {
+      req.flash('success', buildBulkDeleteMessage(result, 'image', 'images'));
+    } else {
+      req.flash('error', buildBulkDeleteMessage(result, 'image', 'images') || 'Failed to delete selected images.');
+    }
+    return res.redirect('/admin/gallery');
+  } catch (err) {
+    console.error('Bulk gallery deletion error:', err);
+    req.flash('error', 'Failed to delete selected images.');
+    return res.redirect('/admin/gallery');
   }
 });
 
@@ -1030,19 +1339,11 @@ router.delete('/projects/:id', async (req, res) => {
   try {
     const db = req.app.locals.db;
     const projId = parseInt(req.params.id);
-    
-    // Verify project exists
-    const proj = await db.get('SELECT id FROM projects WHERE id = ?', projId);
-    if (!proj) {
+    const removed = await deleteProjectRecord(db, projId);
+    if (!removed) {
       req.flash('error', 'Project not found');
       return res.redirect('/admin/projects');
     }
-    
-    // Delete all associated files (hero, documents, update attachments)
-    await deleteProjectFiles(db, projId);
-    
-    // Delete cascades to project_updates and project_documents via FK
-    await db.run('DELETE FROM projects WHERE id = ?', projId);
     
     req.flash('success', 'Project deleted');
     res.redirect('/admin/projects');
@@ -1050,6 +1351,29 @@ router.delete('/projects/:id', async (req, res) => {
     console.error('Project deletion error:', err);
     req.flash('error', 'Failed to delete project: ' + (err.message || 'Unknown error'));
     res.redirect('/admin/projects');
+  }
+});
+
+router.post('/projects/bulk-delete', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const ids = normalizeSelectedIds(req.body.selected_ids);
+    if (!ids.length) {
+      req.flash('error', 'Select at least one project to delete.');
+      return res.redirect('/admin/projects');
+    }
+
+    const result = await bulkDeleteRecords(ids, (projectId) => deleteProjectRecord(db, projectId));
+    if (result.deleted > 0 && result.failed === 0) {
+      req.flash('success', buildBulkDeleteMessage(result, 'project', 'projects'));
+    } else {
+      req.flash('error', buildBulkDeleteMessage(result, 'project', 'projects') || 'Failed to delete selected projects.');
+    }
+    return res.redirect('/admin/projects');
+  } catch (err) {
+    console.error('Bulk project deletion error:', err);
+    req.flash('error', 'Failed to delete selected projects.');
+    return res.redirect('/admin/projects');
   }
 });
 

@@ -1099,6 +1099,106 @@ function initAdminMembershipToggles() {
   });
 }
 
+function initAdminBulkSelection() {
+  const bulkRoots = document.querySelectorAll('[data-bulk-select-root]');
+
+  bulkRoots.forEach((root) => {
+    if (root.dataset.bulkBound === 'true') return;
+    root.dataset.bulkBound = 'true';
+
+    const startBtn = root.querySelector('[data-bulk-select-start]');
+    const stopBtn = root.querySelector('[data-bulk-select-stop]');
+    const form = root.querySelector('[data-bulk-delete-form]');
+    const deleteBtn = root.querySelector('[data-bulk-delete-button]');
+    const countEl = root.querySelector('[data-bulk-selection-count]');
+    const checkboxes = Array.from(root.querySelectorAll('[data-bulk-select-checkbox]'));
+    const singularLabel = root.dataset.bulkLabelSingular || 'item';
+    const pluralLabel = root.dataset.bulkLabelPlural || 'items';
+    let isSelectionMode = false;
+
+    if (!startBtn || !stopBtn || !form || !deleteBtn || !countEl || !checkboxes.length) {
+      return;
+    }
+
+    function getSelectedCount() {
+      return checkboxes.filter((checkbox) => checkbox.checked).length;
+    }
+
+    function updateSelectedItems() {
+      checkboxes.forEach((checkbox) => {
+        const item = checkbox.closest('[data-bulk-select-item]');
+        if (!item) return;
+        item.classList.toggle('is-bulk-selected', checkbox.checked);
+      });
+    }
+
+    function syncState() {
+      const selectedCount = getSelectedCount();
+      root.classList.toggle('is-selection-mode', isSelectionMode);
+      stopBtn.hidden = !isSelectionMode;
+      form.hidden = !isSelectionMode;
+      deleteBtn.disabled = selectedCount === 0;
+      countEl.textContent = `${selectedCount} ${selectedCount === 1 ? singularLabel : pluralLabel} selected`;
+      updateSelectedItems();
+
+      if (!isSelectionMode) {
+        root.querySelectorAll('.membership-panel').forEach((panel) => {
+          panel.style.display = 'none';
+        });
+      }
+    }
+
+    function clearSelection() {
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      updateSelectedItems();
+    }
+
+    startBtn.addEventListener('click', () => {
+      isSelectionMode = true;
+      syncState();
+    });
+
+    stopBtn.addEventListener('click', () => {
+      isSelectionMode = false;
+      clearSelection();
+      syncState();
+    });
+
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener('change', () => {
+        syncState();
+      });
+
+      const item = checkbox.closest('[data-bulk-select-item]');
+      if (!item) return;
+
+      item.addEventListener('click', (event) => {
+        if (!isSelectionMode) return;
+        if (event.target.closest('a, button, input, select, textarea, label, form')) return;
+        checkbox.checked = !checkbox.checked;
+        syncState();
+      });
+    });
+
+    form.addEventListener('submit', (event) => {
+      const selectedCount = getSelectedCount();
+      if (selectedCount === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const label = selectedCount === 1 ? singularLabel : pluralLabel;
+      if (!window.confirm(`Delete ${selectedCount} selected ${label}? This cannot be undone.`)) {
+        event.preventDefault();
+      }
+    });
+
+    syncState();
+  });
+}
+
 function initPageFeatures() {
   if (window.applyCsrfProtection) {
     window.applyCsrfProtection(document);
@@ -1109,6 +1209,7 @@ function initPageFeatures() {
   initVideoControls();
   initGalleryLightbox();
   initAdminMembershipToggles();
+  initAdminBulkSelection();
   refreshPlayerUI();
   syncActiveTrackCard();
   queueSavePlayerState();
