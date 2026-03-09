@@ -503,6 +503,92 @@ footer {
   font-style: italic;
 }
 
+.music-archive-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.music-detail-panel {
+  flex: 0 0 280px;
+  background: rgba(17, 17, 17, 0.95);
+  border: 1px solid #333;
+  padding: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.music-detail-panel h3,
+.music-detail-panel h4 {
+  color: #095F80;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-weight: 700;
+}
+
+.music-detail-panel h3 {
+  margin: 0 0 0.8rem;
+  font-size: 1rem;
+}
+
+.music-detail-panel h4 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.music-detail-empty p,
+.music-detail-artist,
+.music-detail-description {
+  color: #bbb;
+}
+
+.music-detail-artist {
+  margin: 0 0 0.8rem;
+  font-size: 0.9rem;
+}
+
+.music-detail-cover-wrap {
+  margin-bottom: 0.9rem;
+}
+
+.music-detail-cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  border: 1px solid #333;
+}
+
+.music-detail-meta {
+  margin: 0 0 0.8rem;
+}
+
+.music-detail-meta div {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.music-detail-meta dt {
+  color: #888;
+  font-size: 0.82rem;
+}
+
+.music-detail-meta dd {
+  margin: 0;
+  color: #ddd;
+  font-size: 0.85rem;
+}
+
+.music-detail-description {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 /* active track highlight */
 .music-card.active {
   border-color: #095F80;
@@ -800,10 +886,20 @@ footer {
     flex-direction: column;
   }
 
+  .music-archive-main {
+    flex-direction: column;
+  }
+
   .playlist-panel {
     flex: none;
     max-height: none;
     width: 100%;
+  }
+
+  .music-detail-panel {
+    flex: none;
+    width: 100%;
+    position: static;
   }
 }
 

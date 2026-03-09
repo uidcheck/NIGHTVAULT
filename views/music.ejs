@@ -42,30 +42,58 @@
     <% } %>
   </aside>
 
-  <div class="music-grid">
-    <% if (tracks && tracks.length) { %>
-      <% tracks.forEach((track, index) => { %>
-        <div class="music-card" data-filename="<%= track.filename %>" data-title="<%= track.title %>" data-artist="<%= track.artist || '' %>" data-music-id="<%= track.id %>">
-          <div class="cover-container">
-            <% if (track.cover_image) { %>
-              <img src="<%= getArchiveImageUrl('music', track.cover_image) %>" alt="<%= track.title %> cover" class="cover" loading="<%= index < 4 ? 'eager' : 'lazy' %>" decoding="async" width="300" height="300">
-            <% } else { %>
-              <div class="default-cover">
-                <i class="fas fa-music"></i>
-              </div>
-            <% } %>
+  <div class="music-archive-main">
+    <div class="music-grid">
+      <% if (tracks && tracks.length) { %>
+        <% tracks.forEach((track, index) => { %>
+          <div
+            class="music-card"
+            data-filename="<%= track.filename %>"
+            data-title="<%= track.title %>"
+            data-artist="<%= track.artist || '' %>"
+            data-album="<%= track.album || '' %>"
+            data-year="<%= track.year || '' %>"
+            data-description="<%= track.description || '' %>"
+            data-cover-url="<%= track.cover_image ? getArchiveImageUrl('music', track.cover_image) : '' %>"
+            data-cover-alt="<%= track.title %> cover"
+            data-music-id="<%= track.id %>">
+            <div class="cover-container">
+              <% if (track.cover_image) { %>
+                <img src="<%= getArchiveImageUrl('music', track.cover_image) %>" alt="<%= track.title %> cover" class="cover" loading="<%= index < 4 ? 'eager' : 'lazy' %>" decoding="async" width="300" height="300">
+              <% } else { %>
+                <div class="default-cover">
+                  <i class="fas fa-music"></i>
+                </div>
+              <% } %>
+            </div>
+            <h3><%= track.title %></h3>
+            <p class="meta">
+              <% if (track.artist) { %><span><%= track.artist %></span><% } %>
+              <% if (track.album) { %><span><%= track.artist ? ' - ' : '' %><%= track.album %></span><% } %>
+              <% if (track.year) { %><span><%= (track.artist||track.album) ? ' (' : '' %><%= track.year %><%= (track.artist||track.album) ? ')' : '' %></span><% } %>
+            </p>
           </div>
-          <h3><%= track.title %></h3>
-          <p class="meta">
-            <% if (track.artist) { %><span><%= track.artist %></span><% } %>
-            <% if (track.album) { %><span><%= track.artist ? ' - ' : '' %><%= track.album %></span><% } %>
-            <% if (track.year) { %><span><%= (track.artist||track.album) ? ' (' : '' %><%= track.year %><%= (track.artist||track.album) ? ')' : '' %></span><% } %>
-          </p>
+        <% }); %>
+      <% } else { %>
+        <p>No tracks available.</p>
+      <% } %>
+    </div>
+
+    <aside class="music-detail-panel" id="music-detail-panel" aria-live="polite">
+      <h3>Track Info</h3>
+      <div class="music-detail-empty" id="music-detail-empty">
+        <p>Select a track to view details.</p>
+      </div>
+      <div class="music-detail-content" id="music-detail-content" hidden>
+        <div class="music-detail-cover-wrap" id="music-detail-cover-wrap" hidden>
+          <img id="music-detail-cover" class="music-detail-cover" alt="Selected track cover" width="300" height="300">
         </div>
-      <% }); %>
-    <% } else { %>
-      <p>No tracks available.</p>
-    <% } %>
+        <h4 id="music-detail-title"></h4>
+        <p class="music-detail-artist" id="music-detail-artist"></p>
+        <dl class="music-detail-meta" id="music-detail-meta"></dl>
+        <p class="music-detail-description" id="music-detail-description"></p>
+      </div>
+    </aside>
   </div>
 </div>
 <%- include('partials/footer') %>

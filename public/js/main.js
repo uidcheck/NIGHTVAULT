@@ -50,6 +50,11 @@ function normalizeTrack(track) {
     filename: track.filename,
     title: (track.title || track.filename || '').trim(),
     artist: (track.artist || '').trim(),
+    album: (track.album || '').trim(),
+    year: track.year || '',
+    description: (track.description || '').trim(),
+    coverUrl: (track.coverUrl || '').trim(),
+    coverAlt: (track.coverAlt || '').trim(),
     id: track.id || null
   };
 }
@@ -65,6 +70,116 @@ function getTrackLabel(track) {
 function getCurrentTrackData() {
   if (!currentTrackFilename) return null;
   return queue.find((track) => track && track.filename === currentTrackFilename) || null;
+}
+
+function getTrackDataFromCard(card) {
+  if (!card) return null;
+
+  return normalizeTrack({
+    filename: card.dataset.filename,
+    title: card.dataset.title,
+    artist: card.dataset.artist,
+    album: card.dataset.album,
+    year: card.dataset.year,
+    description: card.dataset.description,
+    coverUrl: card.dataset.coverUrl,
+    coverAlt: card.dataset.coverAlt,
+    id: card.dataset.musicId || null,
+  });
+}
+
+function getMusicDetailPanelEls() {
+  return {
+    panel: document.getElementById('music-detail-panel'),
+    empty: document.getElementById('music-detail-empty'),
+    content: document.getElementById('music-detail-content'),
+    coverWrap: document.getElementById('music-detail-cover-wrap'),
+    cover: document.getElementById('music-detail-cover'),
+    title: document.getElementById('music-detail-title'),
+    artist: document.getElementById('music-detail-artist'),
+    meta: document.getElementById('music-detail-meta'),
+    description: document.getElementById('music-detail-description'),
+  };
+}
+
+function renderMusicDetailPanel(track) {
+  const els = getMusicDetailPanelEls();
+  if (!els.panel) return;
+
+  const normalizedTrack = normalizeTrack(track);
+  if (!normalizedTrack) {
+    if (els.empty) els.empty.hidden = false;
+    if (els.content) els.content.hidden = true;
+    return;
+  }
+
+  const metaRows = [];
+  if (normalizedTrack.album) metaRows.push({ label: 'Album', value: normalizedTrack.album });
+  if (normalizedTrack.year) metaRows.push({ label: 'Year', value: normalizedTrack.year });
+
+  if (els.title) els.title.textContent = normalizedTrack.title || 'Untitled track';
+  if (els.artist) {
+    els.artist.textContent = normalizedTrack.artist || 'Artist unknown';
+  }
+  if (els.meta) {
+    els.meta.innerHTML = '';
+    const rows = metaRows.length ? metaRows : [{ label: 'Info', value: 'No extra metadata available' }];
+    rows.forEach((row) => {
+      const wrapper = document.createElement('div');
+      const dt = document.createElement('dt');
+      const dd = document.createElement('dd');
+      dt.textContent = row.label;
+      dd.textContent = row.value;
+      wrapper.appendChild(dt);
+      wrapper.appendChild(dd);
+      els.meta.appendChild(wrapper);
+    });
+  }
+  if (els.description) {
+    els.description.textContent = normalizedTrack.description || 'No description available for this track.';
+  }
+  if (els.coverWrap && els.cover) {
+    if (normalizedTrack.coverUrl) {
+      els.cover.src = normalizedTrack.coverUrl;
+      els.cover.alt = normalizedTrack.coverAlt || `${normalizedTrack.title} cover`;
+      els.coverWrap.hidden = false;
+    } else {
+      els.cover.removeAttribute('src');
+      els.coverWrap.hidden = true;
+    }
+  }
+
+  if (els.empty) els.empty.hidden = true;
+  if (els.content) els.content.hidden = false;
+}
+
+function syncMusicDetailPanel(track = null) {
+  const panelEls = getMusicDetailPanelEls();
+  if (!panelEls.panel) return;
+
+  const normalizedTrack = normalizeTrack(track);
+  if (normalizedTrack) {
+    renderMusicDetailPanel(normalizedTrack);
+    return;
+  }
+
+  if (currentTrackFilename) {
+    const matchingCard = Array.from(document.querySelectorAll('.music-card')).find(
+      (card) => card.dataset.filename === currentTrackFilename
+    );
+    if (matchingCard) {
+      renderMusicDetailPanel(getTrackDataFromCard(matchingCard));
+      return;
+    }
+
+    const currentTrack = getCurrentTrackData();
+    if (currentTrack) {
+      renderMusicDetailPanel(currentTrack);
+      return;
+    }
+  }
+
+  renderMusicDetailPanel(null);
 }
 
 function refreshPlayerUI(fallbackText = 'No track') {
@@ -164,6 +279,9 @@ function prepareMediaElementForPlayback() {
 function attemptImmediatePlayback(changeId) {
   if (changeId !== null && (!activeTrackChange || activeTrackChange.id !== changeId)) return;
 
+  const expectedTrack = changeId !== null && activeTrackChange ? activeTrackChange.track : null;
+  const expectedUrl = expectedTrack ? getTrackUrl(expectedTrack.filename) : '';
+
   const media = prepareMediaElementForPlayback();
   if (!media) {
     const playPromise = wavesurfer.play();
@@ -178,6 +296,10 @@ function attemptImmediatePlayback(changeId) {
   const startPlayback = () => {
     if (changeId !== null && (!activeTrackChange || activeTrackChange.id !== changeId)) return;
 
+    if (expectedUrl && media.currentSrc && !media.currentSrc.includes(expectedUrl)) {
+      return;
+    }
+
     const playPromise = media.play();
     if (playPromise && typeof playPromise.catch === 'function') {
       playPromise.catch((err) => {
@@ -185,6 +307,12 @@ function attemptImmediatePlayback(changeId) {
       });
     }
   };
+
+  if (expectedUrl && media.currentSrc && !media.currentSrc.includes(expectedUrl)) {
+    media.addEventListener('loadedmetadata', startPlayback, { once: true });
+    media.addEventListener('canplay', startPlayback, { once: true });
+    return;
+  }
 
   if (media.readyState >= 3) {
     startPlayback();
@@ -520,7 +648,10 @@ function updatePlayPauseLabel() {
 function syncActiveTrackCard() {
   const musicCards = document.querySelectorAll('.music-card');
   musicCards.forEach(card => card.classList.remove('active'));
-  if (!currentTrackFilename) return;
+  if (!currentTrackFilename) {
+    syncMusicDetailPanel(null);
+    return;
+  }
 
   musicCards.forEach(card => {
     const file = card.dataset.filename;
@@ -528,6 +659,8 @@ function syncActiveTrackCard() {
       card.classList.add('active');
     }
   });
+
+  syncMusicDetailPanel();
 }
 
 function transitionToTrack(index, shouldAutoplay = true, source = 'direct') {
@@ -560,6 +693,7 @@ function transitionToTrack(index, shouldAutoplay = true, source = 'direct') {
     shouldAutoplay,
   };
   setNowPlayingTrack(trackData);
+  syncMusicDetailPanel(trackData);
 
   wavesurfer.load(getTrackUrl(trackData.filename));
   if (shouldAutoplay) {
@@ -567,6 +701,14 @@ function transitionToTrack(index, shouldAutoplay = true, source = 'direct') {
   }
   wavesurfer.once('ready', () => {
     if (!activeTrackChange || activeTrackChange.id !== changeId) return;
+    if (shouldAutoplay && !(wavesurfer.isPlaying && wavesurfer.isPlaying())) {
+      const playPromise = wavesurfer.play();
+      if (playPromise && typeof playPromise.catch === 'function') {
+        playPromise.catch((err) => {
+          console.warn('Ready-state playback fallback failed:', err && err.message ? err.message : err);
+        });
+      }
+    }
     clearActiveTrackChange(changeId);
     refreshPlayerUI();
     updatePlayPauseLabel();
@@ -790,10 +932,15 @@ function buildQueueFromDOMCards() {
     const filename = card.dataset.filename;
     const title = (card.dataset.title || '').trim();
     const artist = (card.dataset.artist || '').trim();
+    const album = (card.dataset.album || '').trim();
+    const year = (card.dataset.year || '').trim();
+    const description = (card.dataset.description || '').trim();
+    const coverUrl = (card.dataset.coverUrl || '').trim();
+    const coverAlt = (card.dataset.coverAlt || '').trim();
     const id = card.dataset.musicId || null; // if music_id is available
     
     if (filename) {
-      queueData.push(normalizeTrack({ filename, title, artist, id }));
+      queueData.push(normalizeTrack({ filename, title, artist, album, year, description, coverUrl, coverAlt, id }));
     }
   });
   
@@ -852,6 +999,7 @@ function initMusicPageFeatures() {
     }
   }
   syncActiveTrackCard();
+  syncMusicDetailPanel();
 }
 
 function initVideoControls() {
