@@ -1,6 +1,6 @@
 services:
   paracausal:
-    build: .
+    image: ghcr.io/uidcheck/paracausal:latest
     container_name: paracausal
     restart: unless-stopped
     ports:
