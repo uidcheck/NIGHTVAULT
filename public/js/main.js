@@ -15,6 +15,7 @@ let activeTrackChange = null;
 let lastHandledFinish = null;
 let saveTimer = null;
 const PLAYER_STATE_KEY = 'paracausalPlayerState.v2';
+const TRACK_URL_BASE = '/uploads/music/';
 
 function formatTime(seconds) {
   const safe = Number.isFinite(seconds) ? seconds : 0;
@@ -103,7 +104,7 @@ function getActiveMediaSnapshot() {
 function getFilenameFromMediaSrc(src) {
   if (!src) return '';
 
-  const marker = '/uploads/music/';
+  const marker = TRACK_URL_BASE;
   const markerIndex = src.indexOf(marker);
   if (markerIndex === -1) return '';
 
@@ -145,7 +146,52 @@ function shouldHandleFinishEvent() {
 }
 
 function getTrackUrlFragment(filename) {
-  return filename ? `/uploads/music/${filename}` : '';
+  return filename ? `${TRACK_URL_BASE}${filename}` : '';
+}
+
+function getTrackUrl(filename) {
+  return getTrackUrlFragment(filename);
+}
+
+function prepareMediaElementForPlayback() {
+  const media = wavesurfer && wavesurfer.backend ? wavesurfer.backend.media : null;
+  if (!media) return null;
+
+  media.preload = 'auto';
+  return media;
+}
+
+function attemptImmediatePlayback(changeId) {
+  if (changeId !== null && (!activeTrackChange || activeTrackChange.id !== changeId)) return;
+
+  const media = prepareMediaElementForPlayback();
+  if (!media) {
+    const playPromise = wavesurfer.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch((err) => {
+        console.warn('Immediate WaveSurfer playback start failed:', err && err.message ? err.message : err);
+      });
+    }
+    return;
+  }
+
+  const startPlayback = () => {
+    if (changeId !== null && (!activeTrackChange || activeTrackChange.id !== changeId)) return;
+
+    const playPromise = media.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch((err) => {
+        console.warn('Deferred playback start failed:', err && err.message ? err.message : err);
+      });
+    }
+  };
+
+  if (media.readyState >= 3) {
+    startPlayback();
+    return;
+  }
+
+  media.addEventListener('canplay', startPlayback, { once: true });
 }
 
 function shouldIgnoreWaveSurferError(failedFilename = '') {
@@ -371,7 +417,7 @@ async function restorePlayerStateIfNeeded() {
         playerLabelState = 'active';
         setNowPlayingTrack(validatedQueue[0]);
 
-        wavesurfer.load(`/uploads/music/${validatedQueue[0].filename}?t=${Date.now()}`);
+        wavesurfer.load(getTrackUrl(validatedQueue[0].filename));
         wavesurfer.once('ready', () => {
           if (durationSpan) durationSpan.textContent = formatTime(wavesurfer.getDuration());
           if (currentTimeSpan) currentTimeSpan.textContent = formatTime(0);
@@ -403,7 +449,7 @@ async function restorePlayerStateIfNeeded() {
 
     const isAlreadyPlaying = isPlayerReady && wavesurfer.isPlaying && wavesurfer.isPlaying();
     const currentUrl = wavesurfer.backend && wavesurfer.backend.media ? wavesurfer.backend.media.currentSrc : '';
-    const targetUrl = `/uploads/music/${state.filename}`;
+    const targetUrl = getTrackUrl(state.filename);
     const isSameTrack = currentUrl.includes(targetUrl);
 
     if (isAlreadyPlaying && isSameTrack) {
@@ -414,7 +460,7 @@ async function restorePlayerStateIfNeeded() {
       return;
     }
 
-    wavesurfer.load(`/uploads/music/${state.filename}?t=${Date.now()}`);
+    wavesurfer.load(getTrackUrl(state.filename));
     wavesurfer.once('ready', () => {
       const duration = wavesurfer.getDuration() || 0;
       const targetTime = Number.isFinite(state.currentTime) ? state.currentTime : 0;
@@ -497,6 +543,7 @@ function transitionToTrack(index, shouldAutoplay = true, source = 'direct') {
   const matchingCard = tracks.find(t => t.dataset.filename === trackData.filename);
   if (matchingCard) matchingCard.classList.add('active');
 
+  isPlayerReady = false;
   queue[index] = trackData;
   currentTrackIndex = index;
   currentTrackFilename = trackData.filename;
@@ -514,11 +561,13 @@ function transitionToTrack(index, shouldAutoplay = true, source = 'direct') {
   };
   setNowPlayingTrack(trackData);
 
-  wavesurfer.load(`/uploads/music/${trackData.filename}?t=${Date.now()}`);
+  wavesurfer.load(getTrackUrl(trackData.filename));
+  if (shouldAutoplay) {
+    attemptImmediatePlayback(changeId);
+  }
   wavesurfer.once('ready', () => {
     if (!activeTrackChange || activeTrackChange.id !== changeId) return;
     clearActiveTrackChange(changeId);
-    if (shouldAutoplay) wavesurfer.play();
     refreshPlayerUI();
     updatePlayPauseLabel();
     syncActiveTrackCard();
@@ -600,6 +649,7 @@ function bindPlayerControls() {
   if (!wavesurfer) {
     wavesurfer = WaveSurfer.create({
       container: '#waveform',
+      backend: 'MediaElement',
       waveColor: '#0ff',
       progressColor: '#a0a',
       height: 30,
@@ -610,6 +660,7 @@ function bindPlayerControls() {
 
     wavesurfer.on('ready', () => {
       isPlayerReady = true;
+      prepareMediaElementForPlayback();
       durationSpan.textContent = formatTime(wavesurfer.getDuration());
       refreshPlayerUI();
       updatePlayPauseLabel();
