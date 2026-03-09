@@ -119,7 +119,20 @@ const { ensureAdmin } = require('./middleware/auth');
   app.set('view engine', 'ejs');
 
   // static
-  app.use(express.static(path.join(__dirname, 'public')));
+  app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+
+      if (['.png', '.jpg', '.jpeg', '.webp', '.avif', '.gif', '.svg', '.ico'].includes(ext)) {
+        res.setHeader('Cache-Control', 'public, max-age=2592000');
+        return;
+      }
+
+      if (['.css', '.js'].includes(ext)) {
+        res.setHeader('Cache-Control', 'public, max-age=604800');
+      }
+    },
+  }));
   app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     maxAge: '30d',
     immutable: true,

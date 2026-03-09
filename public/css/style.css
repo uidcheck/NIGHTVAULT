@@ -7,14 +7,25 @@
 body {
   background-color: #000;
   background-image: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), url('/images/site-bg.png');
+  background-image: linear-gradient(rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.75)), image-set(
+    url('/images/site-bg.webp') type('image/webp'),
+    url('/images/site-bg.png') type('image/png')
+  );
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   background-attachment: fixed;
   color: #eee;
   font-family: 'JetBrains Mono', 'Courier New', monospace;
   line-height: 1.4;
   padding: 0 1rem;
   padding-bottom: 280px;
+}
+
+@media (max-width: 900px) {
+  body {
+    background-attachment: scroll;
+  }
 }
 
 /* heading typography */
