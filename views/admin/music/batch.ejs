@@ -2,10 +2,28 @@
 <%- include('../../partials/messages') %>
 <a href="/admin/music" class="back-link">&larr; Back to music management</a>
 <h2>Batch Upload Music</h2>
-<form action="/admin/music/batch" method="post" enctype="multipart/form-data" class="admin-form">
+<form action="/admin/music/batch" method="post" enctype="multipart/form-data" class="admin-form" id="batch-upload-form" data-no-soft-submit="true" data-upload-progress-form data-upload-processing-label="Upload complete. Processing files..." data-upload-processing-label-wav="Upload complete. Converting WAV files to MP3 and finalising batch..." data-upload-files-label-singular="track" data-upload-files-label-plural="tracks">
   <%- include('../../partials/csrf-field') %>
   <label>Audio Files: <input type="file" name="files" accept="audio/*" multiple required></label>
   <p style="font-size:0.8rem;color:#888;">Select multiple audio files to upload at once. Metadata will be auto-extracted where available.</p>
+  <section class="upload-feedback" data-upload-feedback hidden aria-live="polite" aria-atomic="true">
+    <div class="upload-feedback-header">
+      <h3 data-upload-feedback-title>Preparing batch upload</h3>
+      <span class="upload-feedback-phase" data-upload-feedback-phase>Waiting to start</span>
+    </div>
+    <div class="upload-feedback-bar" aria-hidden="true">
+      <span data-upload-feedback-bar></span>
+    </div>
+    <div class="upload-feedback-meta">
+      <strong data-upload-feedback-percent>0%</strong>
+      <span data-upload-feedback-detail>Select files and upload to see progress.</span>
+    </div>
+    <div class="upload-feedback-processing" data-upload-feedback-processing hidden>
+      <span class="upload-feedback-spinner" aria-hidden="true"></span>
+      <span data-upload-feedback-processing-text>Processing upload...</span>
+    </div>
+    <p class="upload-feedback-error" data-upload-feedback-error hidden></p>
+  </section>
 
   <h3>Shared Album Details</h3>
   <label>Shared Artist: <input type="text" name="default_artist" placeholder="e.g. Artist Name"></label>

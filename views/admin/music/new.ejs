@@ -2,7 +2,7 @@
 <%- include('../../partials/messages') %>
 <a href="/admin/music" class="back-link">&larr; Back to music management</a>
 <h2>Upload Track</h2>
-<form action="/admin/music" method="post" enctype="multipart/form-data" class="admin-form" id="single-upload-form">
+<form action="/admin/music" method="post" enctype="multipart/form-data" class="admin-form" id="single-upload-form" data-no-soft-submit="true" data-upload-progress-form data-upload-processing-label="Upload complete. Finalising track..." data-upload-processing-label-wav="Upload complete. Converting audio to MP3..." data-upload-files-label-singular="track" data-upload-files-label-plural="tracks">
   <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" data-metadata-field="title"></label>
   <label>Artist: <input type="text" name="artist" data-metadata-field="artist"></label>
@@ -13,6 +13,24 @@
   <p id="metadata-status" style="font-size:0.8rem;color:#888; margin-top:-0.5rem;">Choose an audio file to auto-fill embedded metadata where available.</p>
   <label>Cover Image: <input type="file" name="cover" accept="image/*" id="single-track-cover"></label>
   <p style="font-size:0.8rem;color:#888; margin-top:-0.5rem;">Manual cover upload overrides any embedded cover found in the audio file.</p>
+  <section class="upload-feedback" data-upload-feedback hidden aria-live="polite" aria-atomic="true">
+    <div class="upload-feedback-header">
+      <h3 data-upload-feedback-title>Preparing upload</h3>
+      <span class="upload-feedback-phase" data-upload-feedback-phase>Waiting to start</span>
+    </div>
+    <div class="upload-feedback-bar" aria-hidden="true">
+      <span data-upload-feedback-bar></span>
+    </div>
+    <div class="upload-feedback-meta">
+      <strong data-upload-feedback-percent>0%</strong>
+      <span data-upload-feedback-detail>Select a file and upload to see progress.</span>
+    </div>
+    <div class="upload-feedback-processing" data-upload-feedback-processing hidden>
+      <span class="upload-feedback-spinner" aria-hidden="true"></span>
+      <span data-upload-feedback-processing-text>Processing upload...</span>
+    </div>
+    <p class="upload-feedback-error" data-upload-feedback-error hidden></p>
+  </section>
   <div id="embedded-cover-preview" style="display:none; margin:0.5rem 0 1rem;">
     <p style="font-size:0.8rem;color:#888; margin-bottom:0.5rem;">Embedded cover preview</p>
     <img id="embedded-cover-image" alt="Embedded cover preview" style="max-width:180px; border:1px solid #333; display:block;">

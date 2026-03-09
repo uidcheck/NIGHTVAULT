@@ -519,6 +519,46 @@ function buildBulkDeleteMessage(result, singularLabel, pluralLabel) {
   return parts.join('. ');
 }
 
+function isAjaxRequest(req) {
+  const requestedWith = (req.get('X-Requested-With') || '').toLowerCase();
+  const accept = (req.get('Accept') || '').toLowerCase();
+  return requestedWith === 'xmlhttprequest' || accept.includes('application/json');
+}
+
+function respondWithUploadSuccess(req, res, redirectTo, message) {
+  req.flash('success', message);
+
+  if (isAjaxRequest(req)) {
+    return res.status(200).json({
+      ok: true,
+      redirectTo,
+      message,
+    });
+  }
+
+  return res.redirect(redirectTo);
+}
+
+function respondWithUploadError(req, res, options) {
+  const {
+    redirectTo,
+    message,
+    statusCode = 400,
+    flashMessage = message,
+  } = options;
+
+  if (isAjaxRequest(req)) {
+    return res.status(statusCode).json({
+      ok: false,
+      error: message,
+      redirectTo,
+    });
+  }
+
+  req.flash('error', flashMessage);
+  return res.redirect(redirectTo);
+}
+
 
 // dashboard overview
 router.get('/', async (req, res) => {
@@ -588,6 +628,13 @@ router.post('/music', uploadMusicFields, validateCsrfToken, async (req, res) => 
   let cover = manualCover ? manualCover.filename : '';
 
   try {
+    if (!audioFile) {
+      return respondWithUploadError(req, res, {
+        redirectTo: '/admin/music/new',
+        message: 'Select an audio file to upload.',
+      });
+    }
+
     preparedUpload = await prepareMusicUploadForPlayback(audioFile, {
       extractCover: !manualCover,
     });
@@ -636,8 +683,12 @@ router.post('/music', uploadMusicFields, validateCsrfToken, async (req, res) => 
       throw txErr;
     }
 
-    req.flash('success', preparedUpload.convertedToMp3 ? 'Music uploaded and converted to MP3 for faster playback' : 'Music uploaded');
-    res.redirect('/admin/music');
+    return respondWithUploadSuccess(
+      req,
+      res,
+      '/admin/music',
+      preparedUpload.convertedToMp3 ? 'Music uploaded and converted to MP3 for faster playback' : 'Music uploaded'
+    );
   } catch (err) {
     console.error('Single music upload error:', err);
     if (manualCover) {
@@ -651,8 +702,11 @@ router.post('/music', uploadMusicFields, validateCsrfToken, async (req, res) => 
     if (preparedUpload && preparedUpload.extractedCoverFilename && preparedUpload.extractedCoverFilename !== cover) {
       await deleteUploadedFile(preparedUpload.extractedCoverFilename, 'music');
     }
-    req.flash('error', `Failed to upload music: ${err.message || 'Unknown error'}`);
-    res.redirect('/admin/music/new');
+    return respondWithUploadError(req, res, {
+      redirectTo: '/admin/music/new',
+      statusCode: 500,
+      message: `Failed to upload music: ${err.message || 'Unknown error'}`,
+    });
   }
 });
 
@@ -673,6 +727,13 @@ router.post('/music/batch', uploadBatchMusic, validateCsrfToken, async (req, res
   const preparedTracks = [];
 
   try {
+    if (!files.length) {
+      return respondWithUploadError(req, res, {
+        redirectTo: '/admin/music/batch',
+        message: 'Select at least one audio file to upload.',
+      });
+    }
+
     for (const file of files) {
       const prepared = await prepareMusicUploadForPlayback(file, {
         extractCover: !sharedCoverFile,
@@ -736,8 +797,7 @@ router.post('/music/batch', uploadBatchMusic, validateCsrfToken, async (req, res
       ? `Batch uploaded ${preparedTracks.length} tracks (${convertedCount} WAV file${convertedCount === 1 ? '' : 's'} converted to MP3)`
       : `Batch uploaded ${preparedTracks.length} tracks`;
 
-    req.flash('success', successMessage);
-    res.redirect('/admin/music');
+    return respondWithUploadSuccess(req, res, '/admin/music', successMessage);
   } catch (err) {
     console.error('Batch music upload error:', err);
     for (const track of preparedTracks) {
@@ -753,8 +813,11 @@ router.post('/music/batch', uploadBatchMusic, validateCsrfToken, async (req, res
     if (sharedCoverFile) {
       await deleteUploadedFile(sharedCoverFile.filename, 'music');
     }
-    req.flash('error', `Batch upload failed: ${err.message || 'Unknown error'}`);
-    res.redirect('/admin/music/batch');
+    return respondWithUploadError(req, res, {
+      redirectTo: '/admin/music/batch',
+      statusCode: 500,
+      message: `Batch upload failed: ${err.message || 'Unknown error'}`,
+    });
   }
 });
 

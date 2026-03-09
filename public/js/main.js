@@ -1112,11 +1112,17 @@ function initAdminBulkSelection() {
     const deleteBtn = root.querySelector('[data-bulk-delete-button]');
     const countEl = root.querySelector('[data-bulk-selection-count]');
     const checkboxes = Array.from(root.querySelectorAll('[data-bulk-select-checkbox]'));
+    const modal = root.querySelector('[data-bulk-confirm-modal]');
+    const modalCloseEls = modal ? Array.from(modal.querySelectorAll('[data-bulk-confirm-close], [data-bulk-confirm-cancel]')) : [];
+    const modalTitleEl = modal ? modal.querySelector('[data-bulk-confirm-title]') : null;
+    const modalMessageEl = modal ? modal.querySelector('[data-bulk-confirm-message]') : null;
+    const modalConfirmBtn = modal ? modal.querySelector('[data-bulk-confirm-submit]') : null;
     const singularLabel = root.dataset.bulkLabelSingular || 'item';
     const pluralLabel = root.dataset.bulkLabelPlural || 'items';
     let isSelectionMode = false;
+    let lastTrigger = null;
 
-    if (!startBtn || !stopBtn || !form || !deleteBtn || !countEl || !checkboxes.length) {
+    if (!startBtn || !stopBtn || !form || !deleteBtn || !countEl || !checkboxes.length || !modal || !modalTitleEl || !modalMessageEl || !modalConfirmBtn) {
       return;
     }
 
@@ -1155,6 +1161,45 @@ function initAdminBulkSelection() {
       updateSelectedItems();
     }
 
+    function getSelectedLabel(selectedCount) {
+      return selectedCount === 1 ? singularLabel : pluralLabel;
+    }
+
+    function closeModal(restoreFocus = true) {
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+
+      if (restoreFocus && lastTrigger && typeof lastTrigger.focus === 'function') {
+        lastTrigger.focus();
+      }
+    }
+
+    function openModal(triggerEl = null) {
+      const selectedCount = getSelectedCount();
+      if (selectedCount === 0) {
+        return;
+      }
+
+      lastTrigger = triggerEl || deleteBtn;
+      modalTitleEl.textContent = `Delete ${selectedCount} selected ${getSelectedLabel(selectedCount)}?`;
+      modalMessageEl.textContent = `You are about to permanently delete ${selectedCount} selected ${getSelectedLabel(selectedCount)}. This cannot be undone.`;
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+      modalConfirmBtn.focus();
+    }
+
+    function submitConfirmedBulkDelete() {
+      form.dataset.bulkConfirming = 'true';
+      closeModal(false);
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+    }
+
     startBtn.addEventListener('click', () => {
       isSelectionMode = true;
       syncState();
@@ -1162,8 +1207,42 @@ function initAdminBulkSelection() {
 
     stopBtn.addEventListener('click', () => {
       isSelectionMode = false;
+      closeModal(false);
       clearSelection();
       syncState();
+    });
+
+    deleteBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (deleteBtn.disabled) return;
+      openModal(deleteBtn);
+    });
+
+    modalCloseEls.forEach((element) => {
+      element.addEventListener('click', (event) => {
+        event.preventDefault();
+        closeModal();
+      });
+    });
+
+    modalConfirmBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      submitConfirmedBulkDelete();
+    });
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        closeModal();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (modal.hidden) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeModal();
+      }
     });
 
     checkboxes.forEach((checkbox) => {
@@ -1189,13 +1268,291 @@ function initAdminBulkSelection() {
         return;
       }
 
-      const label = selectedCount === 1 ? singularLabel : pluralLabel;
-      if (!window.confirm(`Delete ${selectedCount} selected ${label}? This cannot be undone.`)) {
+      if (form.dataset.bulkConfirming === 'true') {
+        form.dataset.bulkConfirming = 'false';
+        return;
+      }
+
+      event.preventDefault();
+      openModal(deleteBtn);
+    });
+
+    form.addEventListener('reset', () => {
+      closeModal(false);
+    });
+
+    root.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && event.target === deleteBtn) {
         event.preventDefault();
+        if (!deleteBtn.disabled) {
+          openModal(deleteBtn);
+        }
       }
     });
 
     syncState();
+  });
+}
+
+function initAdminUploadProgress() {
+  const uploadForms = document.querySelectorAll('[data-upload-progress-form]');
+
+  uploadForms.forEach((form) => {
+    if (form.dataset.uploadProgressBound === 'true') return;
+    form.dataset.uploadProgressBound = 'true';
+
+    const feedback = form.querySelector('[data-upload-feedback]');
+    const titleEl = form.querySelector('[data-upload-feedback-title]');
+    const phaseEl = form.querySelector('[data-upload-feedback-phase]');
+    const barEl = form.querySelector('[data-upload-feedback-bar]');
+    const percentEl = form.querySelector('[data-upload-feedback-percent]');
+    const detailEl = form.querySelector('[data-upload-feedback-detail]');
+    const processingWrap = form.querySelector('[data-upload-feedback-processing]');
+    const processingTextEl = form.querySelector('[data-upload-feedback-processing-text]');
+    const errorEl = form.querySelector('[data-upload-feedback-error]');
+    const submitButtons = Array.from(form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+    const audioInput = form.querySelector('input[type="file"][name="file"], input[type="file"][name="files"]');
+
+    if (!feedback || !titleEl || !phaseEl || !barEl || !percentEl || !detailEl || !processingWrap || !processingTextEl || !errorEl || !submitButtons.length || !audioInput) {
+      return;
+    }
+
+    const originalButtonLabels = new Map();
+    submitButtons.forEach((button) => {
+      originalButtonLabels.set(button, button.tagName === 'INPUT' ? button.value : button.textContent);
+    });
+
+    function setSubmitButtonState(disabled, label) {
+      submitButtons.forEach((button) => {
+        button.disabled = disabled;
+        if (label) {
+          if (button.tagName === 'INPUT') {
+            button.value = label;
+          } else {
+            button.textContent = label;
+          }
+        } else {
+          const original = originalButtonLabels.get(button);
+          if (button.tagName === 'INPUT') {
+            button.value = original;
+          } else {
+            button.textContent = original;
+          }
+        }
+      });
+    }
+
+    function resetError() {
+      feedback.classList.remove('is-error');
+      errorEl.hidden = true;
+      errorEl.textContent = '';
+    }
+
+    function setProgressState(options) {
+      const {
+        title,
+        phase,
+        percent,
+        detail,
+        showProcessing,
+        processingText,
+      } = options;
+
+      feedback.hidden = false;
+      feedback.removeAttribute('hidden');
+      if (title) titleEl.textContent = title;
+      if (phase) phaseEl.textContent = phase;
+      if (typeof percent === 'number') {
+        const safePercent = Math.max(0, Math.min(100, percent));
+        barEl.style.width = `${safePercent}%`;
+        percentEl.textContent = `${Math.round(safePercent)}%`;
+      }
+      if (detail) detailEl.textContent = detail;
+      processingWrap.hidden = !showProcessing;
+      if (processingText) processingTextEl.textContent = processingText;
+    }
+
+    function showError(message) {
+      feedback.hidden = false;
+      feedback.classList.add('is-error');
+      processingWrap.hidden = true;
+      errorEl.hidden = false;
+      errorEl.textContent = message;
+    }
+
+    function getSelectedFiles() {
+      return Array.from(audioInput.files || []).filter(Boolean);
+    }
+
+    function getSelectedFileSummary() {
+      const files = getSelectedFiles();
+      const singularLabel = form.dataset.uploadFilesLabelSingular || 'file';
+      const pluralLabel = form.dataset.uploadFilesLabelPlural || 'files';
+      if (!files.length) {
+        return `0 ${pluralLabel}`;
+      }
+      if (files.length === 1) {
+        return files[0].name;
+      }
+      return `${files.length} ${files.length === 1 ? singularLabel : pluralLabel}`;
+    }
+
+    function hasWavSelection() {
+      return getSelectedFiles().some((file) => /\.(wav|wave)$/i.test(file.name || '') || /audio\/(wav|wave|x-wav|vnd\.wave)$/i.test(file.type || ''));
+    }
+
+    form.addEventListener('submit', (event) => {
+      if (form.dataset.uploadInFlight === 'true') {
+        event.preventDefault();
+        return;
+      }
+
+      if (!window.XMLHttpRequest || !window.FormData) {
+        return;
+      }
+
+      event.preventDefault();
+      resetError();
+
+      const selectedFiles = getSelectedFiles();
+      if (!selectedFiles.length) {
+        showError('Select at least one audio file before uploading.');
+        return;
+      }
+
+      const isBatch = selectedFiles.length > 1 || audioInput.hasAttribute('multiple');
+      const fileSummary = getSelectedFileSummary();
+      const processingLabel = hasWavSelection()
+        ? (form.dataset.uploadProcessingLabelWav || 'Upload complete. Converting audio to MP3...')
+        : (form.dataset.uploadProcessingLabel || 'Upload complete. Processing upload...');
+
+      form.dataset.uploadInFlight = 'true';
+      form.setAttribute('aria-busy', 'true');
+      setSubmitButtonState(true, 'Uploading...');
+      setProgressState({
+        title: isBatch ? 'Uploading batch' : 'Uploading track',
+        phase: 'Uploading',
+        percent: 0,
+        detail: isBatch ? `Starting upload for ${fileSummary}.` : `Starting upload for ${fileSummary}.`,
+        showProcessing: false,
+      });
+
+      const xhr = new XMLHttpRequest();
+      xhr.open((form.method || 'POST').toUpperCase(), form.action, true);
+      xhr.responseType = 'text';
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.timeout = 10 * 60 * 1000;
+
+      xhr.upload.addEventListener('progress', (progressEvent) => {
+        if (progressEvent.lengthComputable && progressEvent.total > 0) {
+          const percent = (progressEvent.loaded / progressEvent.total) * 100;
+          setProgressState({
+            title: isBatch ? 'Uploading batch' : 'Uploading track',
+            phase: 'Uploading',
+            percent,
+            detail: isBatch
+              ? `Uploading ${fileSummary}.`
+              : `Uploading ${fileSummary}.`,
+            showProcessing: false,
+          });
+        } else {
+          setProgressState({
+            title: isBatch ? 'Uploading batch' : 'Uploading track',
+            phase: 'Uploading',
+            percent: 10,
+            detail: isBatch ? `Uploading ${fileSummary}...` : `Uploading ${fileSummary}...`,
+            showProcessing: false,
+          });
+        }
+      });
+
+      xhr.upload.addEventListener('load', () => {
+        setSubmitButtonState(true, 'Processing...');
+        setProgressState({
+          title: hasWavSelection() ? 'Converting audio' : 'Finalising upload',
+          phase: 'Processing',
+          percent: 100,
+          detail: processingLabel,
+          showProcessing: true,
+          processingText: processingLabel,
+        });
+      });
+
+      xhr.addEventListener('load', () => {
+        form.dataset.uploadInFlight = 'false';
+        form.removeAttribute('aria-busy');
+
+        let payload = null;
+        try {
+          payload = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+        } catch (err) {
+          payload = null;
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300 && payload && payload.ok && payload.redirectTo) {
+          window.location.assign(payload.redirectTo);
+          return;
+        }
+
+        setSubmitButtonState(false);
+        const message = payload && payload.error
+          ? payload.error
+          : 'Upload failed before the server could finish processing.';
+        setProgressState({
+          title: 'Upload failed',
+          phase: 'Error',
+          percent: Math.min(100, parseInt(percentEl.textContent, 10) || 0),
+          detail: 'You can correct the issue and try again.',
+          showProcessing: false,
+        });
+        showError(message);
+      });
+
+      xhr.addEventListener('error', () => {
+        form.dataset.uploadInFlight = 'false';
+        form.removeAttribute('aria-busy');
+        setSubmitButtonState(false);
+        setProgressState({
+          title: 'Upload failed',
+          phase: 'Connection error',
+          percent: Math.min(100, parseInt(percentEl.textContent, 10) || 0),
+          detail: 'The connection dropped before the upload finished.',
+          showProcessing: false,
+        });
+        showError('The upload could not be completed. Check your connection and try again.');
+      });
+
+      xhr.addEventListener('timeout', () => {
+        form.dataset.uploadInFlight = 'false';
+        form.removeAttribute('aria-busy');
+        setSubmitButtonState(false);
+        setProgressState({
+          title: 'Upload timed out',
+          phase: 'Timed out',
+          percent: Math.min(100, parseInt(percentEl.textContent, 10) || 0),
+          detail: 'The server took too long to finish processing this upload.',
+          showProcessing: false,
+        });
+        showError('The upload timed out while the server was processing it. Please try again.');
+      });
+
+      xhr.addEventListener('abort', () => {
+        form.dataset.uploadInFlight = 'false';
+        form.removeAttribute('aria-busy');
+        setSubmitButtonState(false);
+        setProgressState({
+          title: 'Upload cancelled',
+          phase: 'Cancelled',
+          percent: Math.min(100, parseInt(percentEl.textContent, 10) || 0),
+          detail: 'The upload was cancelled before completion.',
+          showProcessing: false,
+        });
+        showError('The upload was cancelled.');
+      });
+
+      xhr.send(new FormData(form));
+    });
   });
 }
 
@@ -1210,6 +1567,7 @@ function initPageFeatures() {
   initGalleryLightbox();
   initAdminMembershipToggles();
   initAdminBulkSelection();
+  initAdminUploadProgress();
   refreshPlayerUI();
   syncActiveTrackCard();
   queueSavePlayerState();
@@ -1362,6 +1720,9 @@ function initSoftNavigation() {
     
     // Skip forms with data-no-soft-submit attribute
     if (form.dataset.noSoftSubmit === 'true') return;
+
+    // Bulk delete uses explicit full-page submission after modal confirmation.
+    if (form.matches('[data-bulk-delete-form]')) return;
     
     // Skip external forms
     if (form.action && !form.action.startsWith(window.location.origin)) return;

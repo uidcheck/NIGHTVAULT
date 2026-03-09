@@ -11,9 +11,9 @@
         <button type="button" class="btn" data-bulk-select-start>Select Projects</button>
         <button type="button" class="btn" data-bulk-select-stop hidden>Stop Selecting</button>
       </div>
-      <form id="projects-bulk-delete-form" action="/admin/projects/bulk-delete" method="post" class="admin-bulk-delete-form" data-bulk-delete-form hidden>
+      <form id="projects-bulk-delete-form" action="/admin/projects/bulk-delete" method="post" class="admin-bulk-delete-form" data-bulk-delete-form data-no-soft-submit="true" hidden>
         <%- include('../../partials/csrf-field') %>
-        <button type="submit" class="btn admin-bulk-delete-btn" data-bulk-delete-button disabled>Delete Selected</button>
+        <button type="button" class="btn admin-bulk-delete-btn" data-bulk-delete-button disabled>Delete Selected</button>
         <span class="admin-bulk-selection-count" data-bulk-selection-count>0 projects selected</span>
       </form>
     </div>
@@ -50,6 +50,7 @@
       </li>
     <% }) %>
     </ul>
+    <%- include('../../partials/admin-bulk-confirm-modal') %>
   </section>
 <% } else { %>
   <p>No projects yet.</p>

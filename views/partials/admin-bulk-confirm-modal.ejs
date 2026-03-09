@@ -1,0 +1,20 @@
+<div class="admin-confirm-modal" data-bulk-confirm-modal hidden aria-hidden="true">
+  <div class="admin-confirm-modal__backdrop" data-bulk-confirm-close></div>
+  <div
+    class="admin-confirm-modal__dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="bulk-confirm-title"
+    aria-describedby="bulk-confirm-message"
+  >
+    <p class="admin-confirm-modal__eyebrow">Confirm bulk delete</p>
+    <h3 class="admin-confirm-modal__title" id="bulk-confirm-title" data-bulk-confirm-title>Delete selected items?</h3>
+    <p class="admin-confirm-modal__message" id="bulk-confirm-message" data-bulk-confirm-message>
+      This action cannot be undone.
+    </p>
+    <div class="admin-confirm-modal__actions">
+      <button type="button" class="btn" data-bulk-confirm-cancel>Cancel</button>
+      <button type="button" class="btn admin-confirm-modal__danger" data-bulk-confirm-submit>Confirm delete</button>
+    </div>
+  </div>
+</div>
