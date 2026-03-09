@@ -83,6 +83,10 @@ main {
   max-width: 900px;
   margin: 2rem auto;
 }
+
+main:has(.music-archive-page) {
+  max-width: 1220px;
+}
 footer {
   text-align: center;
   padding: 1rem 0;
@@ -511,8 +515,17 @@ footer {
   align-items: flex-start;
 }
 
+.music-archive-page .playlist-panel {
+  flex: 0 0 180px;
+}
+
+.music-archive-page .music-grid {
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+}
+
 .music-detail-panel {
-  flex: 0 0 280px;
+  flex: 0 0 230px;
   background: rgba(17, 17, 17, 0.95);
   border: 1px solid #333;
   padding: 1rem;
@@ -566,7 +579,7 @@ footer {
 
 .music-detail-meta div {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 52px 1fr;
   gap: 0.5rem;
   margin-bottom: 0.35rem;
 }
@@ -587,6 +600,15 @@ footer {
   font-size: 0.88rem;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.music-archive-page .music-card {
+  padding: 0.85rem;
+}
+
+.music-archive-page .cover-container {
+  width: 136px;
+  height: 136px;
 }
 
 /* active track highlight */
@@ -1080,6 +1102,10 @@ footer {
 }
 /* lightbox duplicate - consolidated above */
 @media (max-width: 600px) {
+  main:has(.music-archive-page) {
+    max-width: 900px;
+  }
+
   .search-form input,
   .search-form select {
     width: 100%;
