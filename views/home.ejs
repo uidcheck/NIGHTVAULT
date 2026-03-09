@@ -41,13 +41,12 @@
     <% if (socialLinks.length) { %>
       <section class="homepage-link-section">
         <div class="homepage-link-section__header">
-          <p class="homepage-link-section__eyebrow">Section</p>
           <h3>Socials</h3>
         </div>
         <div class="homepage-link-list">
           <% socialLinks.forEach((link) => { %>
             <div class="homepage-link-card">
-              <a href="<%= link.url %>" class="homepage-link-card__link">
+              <a href="<%= link.url %>" class="homepage-link-card__link" target="_blank" rel="noopener noreferrer">
                 <span class="homepage-link-card__title"><%= link.title %></span>
               </a>
               <% if (link.description) { %>
@@ -62,13 +61,12 @@
     <% if (otherLinks.length) { %>
       <section class="homepage-link-section">
         <div class="homepage-link-section__header">
-          <p class="homepage-link-section__eyebrow">Section</p>
           <h3>Other Links</h3>
         </div>
         <div class="homepage-link-list">
           <% otherLinks.forEach((link) => { %>
             <div class="homepage-link-card">
-              <a href="<%= link.url %>" class="homepage-link-card__link">
+              <a href="<%= link.url %>" class="homepage-link-card__link" target="_blank" rel="noopener noreferrer">
                 <span class="homepage-link-card__title"><%= link.title %></span>
               </a>
               <% if (link.description) { %>

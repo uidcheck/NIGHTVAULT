@@ -135,13 +135,6 @@ footer {
 .homepage-link-section__header {
   margin-bottom: 0.9rem;
 }
-.homepage-link-section__eyebrow {
-  color: #8ed0e7;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.72rem;
-  margin-bottom: 0.25rem;
-}
 .homepage-link-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
