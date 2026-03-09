@@ -6,6 +6,7 @@
 
 <% if (tracks && tracks.length) { %>
   <form action="/admin/playlists/music/<%= playlist.id %>/order" method="post">
+    <%- include('../../partials/csrf-field') %>
     <div style="display:flex; gap:0.6rem; margin-bottom:1rem; flex-wrap:wrap;">
       <button type="submit" class="btn">Save All Changes</button>
       <button type="button" id="auto-renumber" class="btn">Auto-renumber Sequentially</button>

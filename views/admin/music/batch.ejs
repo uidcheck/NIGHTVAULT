@@ -3,6 +3,7 @@
 <a href="/admin/music" class="back-link">&larr; Back to music management</a>
 <h2>Batch Upload Music</h2>
 <form action="/admin/music/batch" method="post" enctype="multipart/form-data" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Audio Files: <input type="file" name="files" accept="audio/*" multiple required></label>
   <p style="font-size:0.8rem;color:#888;">Select multiple audio files to upload at once. Metadata will be auto-extracted where available.</p>
 

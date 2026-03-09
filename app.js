@@ -1,4 +1,5 @@
 require('dotenv').config();
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
@@ -12,6 +13,11 @@ const ffmpegStatic = require('ffmpeg-static');
 const ffprobeStatic = require('ffprobe-static');
 const { DB_FILE_PATH, ensureDbDirectoryExists } = require('./database/db-config');
 const SqliteSessionStore = require('./database/sqlite-session-store');
+const {
+  attachCsrfToken,
+  parseTrustProxySetting,
+  validateCsrfTokenForNonMultipart,
+} = require('./middleware/security');
 const { ensureArchiveVariant, getArchiveImageUrl } = require('./utils/image-variants');
 
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -111,8 +117,22 @@ const { ensureAdmin } = require('./middleware/auth');
 
   // make db available via app.locals
   const app = express();
+  const isProduction = process.env.NODE_ENV === 'production';
+  const trustProxySetting = parseTrustProxySetting(process.env.TRUST_PROXY, isProduction ? 1 : false);
+  const sessionSecret = process.env.SESSION_SECRET;
+
   app.locals.db = db;
   app.locals.getArchiveImageUrl = getArchiveImageUrl;
+  app.disable('x-powered-by');
+  app.set('trust proxy', trustProxySetting);
+
+  if (!sessionSecret && isProduction) {
+    throw new Error('SESSION_SECRET must be set when NODE_ENV=production.');
+  }
+
+  if (!sessionSecret) {
+    console.warn('SESSION_SECRET is not set. Using a temporary fallback secret for local development only.');
+  }
 
   // view engine
   app.set('views', path.join(__dirname, 'views'));
@@ -152,12 +172,15 @@ const { ensureAdmin } = require('./middleware/auth');
   app.use(
     session({
       store: sessionStore,
-      secret: process.env.SESSION_SECRET || 'change-this',
+      secret: sessionSecret || crypto.randomBytes(32).toString('hex'),
+      name: process.env.SESSION_COOKIE_NAME || 'paracausal.sid',
+      proxy: !!trustProxySetting,
       resave: false,
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
         sameSite: 'lax',
+        secure: isProduction ? 'auto' : false,
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
       }
     })
@@ -189,6 +212,8 @@ const { ensureAdmin } = require('./middleware/auth');
     next();
   });
 
+  app.use(attachCsrfToken);
+
   // set locals middleware
   app.use((req, res, next) => {
     res.locals.currentUser = req.session.admin || null;
@@ -196,6 +221,8 @@ const { ensureAdmin } = require('./middleware/auth');
     res.locals.error = req.flash('error');
     next();
   });
+
+  app.use(validateCsrfTokenForNonMultipart);
 
   // routes
   app.use('/', publicRoutes);

@@ -13,10 +13,12 @@
         <button type="button" class="toggle-membership">Collections (<%= count %>)</button>
         <a href="/admin/projects/<%= p.id %>/edit">edit</a> |
         <form action="/admin/projects/<%= p.id %>?_method=DELETE" method="post" style="display:inline;">
+          <%- include('../../partials/csrf-field') %>
           <button type="submit" class="link-button">delete</button>
         </form>
         <div class="membership-panel" style="display:none;">
           <form method="post" action="/admin/projects/<%= p.id %>/collections">
+            <%- include('../../partials/csrf-field') %>
             <% if (collections && collections.length) { %>
               <% collections.forEach(c => { %>
                 <label style="display:block; font-size:0.85rem;">

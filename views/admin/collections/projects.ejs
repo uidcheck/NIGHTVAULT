@@ -7,6 +7,7 @@
   <div>
     <h3>Create New Collection</h3>
     <form action="/admin/collections/projects" method="post" class="admin-form">
+      <%- include('../../partials/csrf-field') %>
       <label>Title: <input type="text" name="title" required></label>
       <label>Description: <textarea name="description"></textarea></label>
       <button type="submit">Create</button>
@@ -24,6 +25,7 @@
             <p style="font-size: 0.8rem; color: #666; margin: 0.2rem 0 0.5rem;">Projects: <%= c.item_count || 0 %></p>
             <a href="/admin/collections/projects/<%= c.id %>/edit">edit</a> |
             <form action="/admin/collections/projects/<%= c.id %>?_method=DELETE" method="post" style="display:inline;">
+              <%- include('../../partials/csrf-field') %>
               <button type="submit" class="link-button">delete</button>
             </form>
           </li>

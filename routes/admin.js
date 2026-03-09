@@ -7,6 +7,7 @@ const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
 const mm = require('music-metadata');
+const { validateCsrfToken } = require('../middleware/security');
 const { ensureArchiveVariant, deleteArchiveVariant } = require('../utils/image-variants');
 
 // set ffmpeg path
@@ -55,6 +56,32 @@ const deleteUploadedFile = async (filename, subdir) => {
   return await safeDeleteFile(filePath);
 };
 
+const countMusicCoverReferences = async (db, coverFilename, excludeMusicId = null) => {
+  if (!coverFilename) return 0;
+
+  let sql = 'SELECT COUNT(*) as count FROM music WHERE cover_image = ?';
+  const params = [coverFilename];
+
+  if (excludeMusicId !== null && excludeMusicId !== undefined) {
+    sql += ' AND id != ?';
+    params.push(excludeMusicId);
+  }
+
+  const row = await db.get(sql, ...params);
+  return row && Number.isFinite(row.count) ? row.count : 0;
+};
+
+const deleteMusicCoverIfUnreferenced = async (db, coverFilename, excludeMusicId = null) => {
+  if (!coverFilename) return false;
+
+  const referenceCount = await countMusicCoverReferences(db, coverFilename, excludeMusicId);
+  if (referenceCount > 0) {
+    return false;
+  }
+
+  return deleteUploadedFile(coverFilename, 'music');
+};
+
 /**
  * Delete all files associated with a music track
  */
@@ -67,7 +94,7 @@ const deleteMusicFiles = async (db, musicId) => {
   
   // Delete cover image if present
   if (track.cover_image) {
-    await deleteUploadedFile(track.cover_image, 'music');
+    await deleteMusicCoverIfUnreferenced(db, track.cover_image, musicId);
   }
 };
 
@@ -348,7 +375,7 @@ router.get('/music/new', async (req, res) => {
   res.render('admin/music/new', { playlists });
 });
 
-router.post('/music/metadata-preview', uploadMusicPreview.single('file'), async (req, res) => {
+router.post('/music/metadata-preview', uploadMusicPreview.single('file'), validateCsrfToken, async (req, res) => {
   try {
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({ error: 'No audio file provided' });
@@ -374,7 +401,7 @@ router.post('/music/metadata-preview', uploadMusicPreview.single('file'), async 
   }
 });
 
-router.post('/music', uploadMusicFields, async (req, res) => {
+router.post('/music', uploadMusicFields, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { title, artist, album, year, description, order_index, playlist_id, new_playlist_title } = req.body;
   const filename = req.files && req.files.file ? req.files.file[0].filename : '';
@@ -440,7 +467,7 @@ router.get('/music/batch', async (req, res) => {
   res.render('admin/music/batch', { playlists });
 });
 
-router.post('/music/batch', uploadBatchMusic, async (req, res) => {
+router.post('/music/batch', uploadBatchMusic, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { default_artist, default_album, default_year, shared_description, playlist_id, new_playlist_title } = req.body;
   const files = req.files.files || [];
@@ -514,19 +541,20 @@ router.get('/music/:id/edit', async (req, res) => {
   res.render('admin/music/edit', { track, playlists, selectedPlaylists: selected });
 });
 
-router.put('/music/:id', uploadMusicFields, async (req, res) => {
+router.put('/music/:id', uploadMusicFields, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { title, artist, album, year, description, order_index, playlists } = req.body;
   const file = req.files && req.files.file ? req.files.file[0].filename : null;
   const cover = req.files && req.files.cover ? req.files.cover[0].filename : null;
   const track = await db.get('SELECT * FROM music WHERE id = ?', req.params.id);
+  const trackId = parseInt(req.params.id, 10);
   
   // Delete old files if they're being replaced
   if (file && track.filename && file !== track.filename) {
     await deleteUploadedFile(track.filename, 'music');
   }
   if (cover && track.cover_image && cover !== track.cover_image) {
-    await deleteUploadedFile(track.cover_image, 'music');
+    await deleteMusicCoverIfUnreferenced(db, track.cover_image, trackId);
   }
   
   const filename = file || track.filename;
@@ -592,7 +620,7 @@ router.get('/videos/new', async (req, res) => {
   res.render('admin/videos/new', { playlists });
 });
 
-router.post('/videos', uploadVideoFields, async (req, res) => {
+router.post('/videos', uploadVideoFields, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { title, description, embed_url, category, playlists } = req.body;
   const filename = req.files && req.files.file ? req.files.file[0].filename : null;
@@ -639,7 +667,7 @@ router.get('/videos/:id/edit', async (req, res) => {
   res.render('admin/videos/edit', { video, playlists, selectedPlaylists: selected });
 });
 
-router.put('/videos/:id', uploadVideoFields, async (req, res) => {
+router.put('/videos/:id', uploadVideoFields, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { title, description, embed_url, category, playlists } = req.body;
   const file = req.files && req.files.file ? req.files.file[0].filename : null;
@@ -732,7 +760,7 @@ router.get('/gallery/new', async (req, res) => {
   res.render('admin/gallery/new', { collections });
 });
 
-router.post('/gallery', uploadImage.single('file'), async (req, res) => {
+router.post('/gallery', uploadImage.single('file'), validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { title, caption, category, collections } = req.body;
   const filename = req.file ? req.file.filename : null;
@@ -766,7 +794,7 @@ router.get('/gallery/:id/edit', async (req, res) => {
   res.render('admin/gallery/edit', { img, collections, collectionIds: selected });
 });
 
-router.put('/gallery/:id', uploadImage.single('file'), async (req, res) => {
+router.put('/gallery/:id', uploadImage.single('file'), validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
   const { title, caption, category, collections } = req.body;
   const file = req.file ? req.file.filename : null;
@@ -867,7 +895,7 @@ router.get('/projects/new', async (req, res) => {
   res.render('admin/projects/new', { collections });
 });
 
-router.post('/projects', uploadProjectWithDocs, async (req, res) => {
+router.post('/projects', uploadProjectWithDocs, validateCsrfToken, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const { title, summary, description, status, tags } = req.body;
@@ -934,7 +962,7 @@ router.get('/projects/:id/edit', async (req, res) => {
   res.render('admin/projects/edit', { proj, updates, collectionIds: colIds, collections });
 });
 
-router.put('/projects/:id', uploadProjectWithDocs, async (req, res) => {
+router.put('/projects/:id', uploadProjectWithDocs, validateCsrfToken, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const { title, summary, description, status, tags } = req.body;
@@ -1026,7 +1054,7 @@ router.delete('/projects/:id', async (req, res) => {
 });
 
 // project updates
-router.post('/projects/:id/updates', uploadUpdateWithDocs, async (req, res) => {
+router.post('/projects/:id/updates', uploadUpdateWithDocs, validateCsrfToken, async (req, res) => {
   try {
     const db = req.app.locals.db;
     const { content } = req.body;

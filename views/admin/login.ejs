@@ -2,6 +2,7 @@
 <%- include('../partials/messages') %>
 <h2>Admin Login</h2>
 <form action="/login" method="post" class="admin-form" data-no-soft-submit="true">
+  <%- include('../partials/csrf-field') %>
   <label>Username: <input type="text" name="username" required></label>
   <label>Password: <input type="password" name="password" required></label>
   <button type="submit">Login</button>

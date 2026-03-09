@@ -7,6 +7,7 @@
   <div>
     <h3>Create New Playlist</h3>
     <form action="/admin/playlists/music" method="post" class="admin-form">
+      <%- include('../../partials/csrf-field') %>
       <label>Title: <input type="text" name="title" required></label>
       <label>Description: <textarea name="description"></textarea></label>
       <button type="submit">Create</button>
@@ -24,6 +25,7 @@
             <a href="/admin/playlists/music/<%= p.id %>/edit">edit</a> |
             <a href="/admin/playlists/music/<%= p.id %>/tracks">tracks</a> |
             <form action="/admin/playlists/music/<%= p.id %>?_method=DELETE" method="post" style="display:inline;">
+              <%- include('../../partials/csrf-field') %>
               <button type="submit" class="link-button">delete</button>
             </form>
           </li>

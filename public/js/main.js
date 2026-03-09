@@ -1100,6 +1100,9 @@ function initAdminMembershipToggles() {
 }
 
 function initPageFeatures() {
+  if (window.applyCsrfProtection) {
+    window.applyCsrfProtection(document);
+  }
   bindPlayerControls();
   initFullReloadPersistence();
   initMusicPageFeatures();

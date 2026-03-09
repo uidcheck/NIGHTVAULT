@@ -3,6 +3,7 @@
 <a href="/admin/music" class="back-link">&larr; Back to music management</a>
 <h2>Edit Track</h2>
 <form action="/admin/music/<%= track.id %>?_method=PUT" method="post" enctype="multipart/form-data" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" value="<%= track.title %>" required></label>
   <label>Artist: <input type="text" name="artist" value="<%= track.artist %>"></label>
   <label>Album: <input type="text" name="album" value="<%= track.album %>"></label>

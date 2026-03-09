@@ -3,6 +3,7 @@
 <a href="/admin/projects" class="back-link">&larr; Back to project management</a>
 <h2>Edit Project</h2>
 <form action="/admin/projects/<%= proj.id %>?_method=PUT" method="post" enctype="multipart/form-data" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" value="<%= proj.title %>" required></label>
   <label>Summary:<textarea name="summary"><%= proj.summary %></textarea></label>
   <label>Description:<textarea name="description"><%= proj.description %></textarea></label>
@@ -23,6 +24,7 @@
 
 <h3 style="margin-top: 2rem;">Add New Update</h3>
 <form action="/admin/projects/<%= proj.id %>/updates" method="post" enctype="multipart/form-data" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Update Content:<textarea name="content" required></textarea></label>
   <label>Attachments (optional): <input type="file" name="documents" accept=".pdf,.doc,.docx,.txt" multiple></label>
   <button type="submit">Add Update</button>
@@ -44,6 +46,7 @@
         <% } %>
         <div class="update-actions">
           <form action="/admin/projects/<%= proj.id %>/updates/<%= u.id %>?_method=DELETE" method="post" style="display:inline;">
+            <%- include('../../partials/csrf-field') %>
             <button type="submit" class="link-button" style="color: #a00; font-size: 0.85rem;">delete</button>
           </form>
         </div>

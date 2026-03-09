@@ -7,6 +7,7 @@
   <div>
     <h3>Create New Playlist</h3>
     <form action="/admin/playlists/videos" method="post" class="admin-form">
+      <%- include('../../partials/csrf-field') %>
       <label>Title: <input type="text" name="title" required></label>
       <label>Description: <textarea name="description"></textarea></label>
       <button type="submit">Create</button>
@@ -23,6 +24,7 @@
             <% if (p.description) { %><p style="font-size: 0.85rem; color: #888; margin: 0.3rem 0;"><%= p.description %></p><% } %>
             <a href="/admin/playlists/videos/<%= p.id %>/edit">edit</a> |
             <form action="/admin/playlists/videos/<%= p.id %>?_method=DELETE" method="post" style="display:inline;">
+              <%- include('../../partials/csrf-field') %>
               <button type="submit" class="link-button">delete</button>
             </form>
           </li>

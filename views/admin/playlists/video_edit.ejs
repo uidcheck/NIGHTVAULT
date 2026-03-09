@@ -4,6 +4,7 @@
 <h2>Edit Video Playlist</h2>
 
 <form action="/admin/playlists/videos/<%= playlist.id %>?_method=PUT" method="post" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" value="<%= playlist.title %>" required></label>
   <label>Description: <textarea name="description"><%= playlist.description || '' %></textarea></label>
   <button type="submit">Update Playlist</button>

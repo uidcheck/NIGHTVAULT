@@ -3,6 +3,7 @@
 <a href="/admin/playlists/music" class="back-link">&larr; Back to music playlists</a>
 <h2>Edit Music Playlist</h2>
 <form action="/admin/playlists/music/<%= playlist.id %>?_method=PUT" method="post" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" value="<%= playlist.title %>" required></label>
   <label>Description: <textarea name="description"><%= playlist.description || '' %></textarea></label>
   <button type="submit">Update</button>

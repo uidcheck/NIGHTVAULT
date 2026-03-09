@@ -23,6 +23,57 @@
       </div>
     </div>
   </div>
+  <script>
+    (() => {
+      function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.content : '';
+      }
+
+      function shouldProtectForm(form) {
+        if (!form) return false;
+
+        const method = (form.getAttribute('method') || 'get').toUpperCase();
+        if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+          return false;
+        }
+
+        const action = form.getAttribute('action') || window.location.href;
+        const url = new URL(action, window.location.origin);
+        return url.origin === window.location.origin;
+      }
+
+      function ensureCsrfField(form, token) {
+        let field = form.querySelector('input[name="_csrf"]');
+        if (!field) {
+          field = document.createElement('input');
+          field.type = 'hidden';
+          field.name = '_csrf';
+          form.appendChild(field);
+        }
+        field.value = token;
+      }
+
+      function applyCsrfProtection(root = document) {
+        const token = getCsrfToken();
+        if (!token || !root || !root.querySelectorAll) return;
+
+        root.querySelectorAll('form').forEach((form) => {
+          if (!shouldProtectForm(form)) return;
+          ensureCsrfField(form, token);
+        });
+      }
+
+      window.getCsrfToken = getCsrfToken;
+      window.applyCsrfProtection = applyCsrfProtection;
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => applyCsrfProtection(document));
+      } else {
+        applyCsrfProtection(document);
+      }
+    })();
+  </script>
   <script src="/js/main.js"></script>
 </body>
 </html>

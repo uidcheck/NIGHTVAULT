@@ -152,6 +152,7 @@ Example:
 ```env
 PORT=3000
 SESSION_SECRET=replace-this-with-a-long-random-secret
+TRUST_PROXY=1
 # Optional: override SQLite file path (default: database/paracausal.db)
 # DB_PATH=database/paracausal.db
 ```
@@ -252,6 +253,22 @@ Example Docker path: `/app/data/paracausal.db`
 - Expired sessions are automatically cleaned up every 15 minutes
 - Production-safe session handling (no more MemoryStore warnings)
 - Sessions work correctly in Docker and containerized deployments
+
+## Session And CSRF Hardening
+
+- `SESSION_SECRET` is required when `NODE_ENV=production`
+- In local development, if `SESSION_SECRET` is not set, the app uses a temporary fallback secret and logs a warning
+- Session cookies are `httpOnly`, `sameSite=lax`, and use automatic `secure` handling in production
+- `TRUST_PROXY=1` is recommended when running behind HTTPS via a reverse proxy so secure cookies are detected correctly
+- State-changing auth and admin forms are protected by CSRF tokens
+
+If you deploy behind a reverse proxy such as Nginx, Caddy, or a platform load balancer, set:
+
+```env
+NODE_ENV=production
+SESSION_SECRET=replace-this-with-a-long-random-secret
+TRUST_PROXY=1
+```
 
 Database files should not be committed to Git. Keep live database files outside version control.
 

@@ -3,6 +3,7 @@
 <a href="/admin/projects" class="back-link">&larr; Back to project management</a>
 <h2>Create Project</h2>
 <form action="/admin/projects" method="post" enctype="multipart/form-data" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" required></label>
   <label>Summary:<textarea name="summary"></textarea></label>
   <label>Description:<textarea name="description"></textarea></label>

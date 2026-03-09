@@ -3,6 +3,7 @@
 <a href="/admin/videos" class="back-link">&larr; Back to video management</a>
 <h2>Edit Video</h2>
 <form action="/admin/videos/<%= video.id %>?_method=PUT" method="post" enctype="multipart/form-data" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" value="<%= video.title %>" required></label>
   <label>Description:<textarea name="description"><%= video.description %></textarea></label>
   <label>Category: <input type="text" name="category" value="<%= video.category %>"></label>

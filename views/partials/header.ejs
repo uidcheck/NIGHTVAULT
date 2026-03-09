@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
   <script src="https://unpkg.com/wavesurfer.js"></script>
+  <meta name="csrf-token" content="<%= csrfToken || '' %>">
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="shortcut icon" href="/favicon.png" type="image/png">
 </head>
@@ -28,6 +29,7 @@
           <li><a href="/admin">Dashboard</a></li>
           <li>
             <form action="/logout" method="post" style="display:inline;">
+              <%- include('csrf-field') %>
               <button type="submit" class="link-button">Logout</button>
             </form>
           </li>

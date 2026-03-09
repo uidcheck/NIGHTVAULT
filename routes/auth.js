@@ -13,9 +13,17 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
   const admin = await db.get('SELECT * FROM admins WHERE username = ?', username);
   if (admin && await bcrypt.compare(password, admin.password)) {
-    req.session.admin = { id: admin.id, username: admin.username };
-    req.flash('success', 'Logged in successfully');
-    return res.redirect('/admin');
+    return req.session.regenerate((err) => {
+      if (err) {
+        console.error('Session regeneration failed during login:', err);
+        req.flash('error', 'Unable to start a secure session. Please try again.');
+        return res.redirect('/login');
+      }
+
+      req.session.admin = { id: admin.id, username: admin.username };
+      req.session.flash = { success: 'Logged in successfully' };
+      return res.redirect('/admin');
+    });
   }
   req.flash('error', 'Invalid credentials');
   res.redirect('/login');

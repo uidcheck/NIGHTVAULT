@@ -3,6 +3,7 @@
 <a href="/admin/gallery" class="back-link">&larr; Back to gallery management</a>
 <h2>Edit Image</h2>
 <form action="/admin/gallery/<%= img.id %>?_method=PUT" method="post" enctype="multipart/form-data" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" value="<%= img.title %>"></label>
   <label>Caption:<textarea name="caption"><%= img.caption %></textarea></label>
   <label>Category: <input type="text" name="category" value="<%= img.category %>"></label>

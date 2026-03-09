@@ -3,6 +3,7 @@
 <a href="/admin/music" class="back-link">&larr; Back to music management</a>
 <h2>Upload Track</h2>
 <form action="/admin/music" method="post" enctype="multipart/form-data" class="admin-form" id="single-upload-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" data-metadata-field="title"></label>
   <label>Artist: <input type="text" name="artist" data-metadata-field="artist"></label>
   <label>Album: <input type="text" name="album" data-metadata-field="album"></label>
@@ -85,6 +86,10 @@
 
       const body = new FormData();
       body.append('file', file);
+      const csrfToken = window.getCsrfToken ? window.getCsrfToken() : '';
+      if (csrfToken) {
+        body.append('_csrf', csrfToken);
+      }
       setStatus('Reading embedded metadata...');
 
       try {

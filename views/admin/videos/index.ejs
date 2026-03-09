@@ -12,10 +12,12 @@
         <button type="button" class="toggle-membership">Playlists (<%= count %>)</button>
         <a href="/admin/videos/<%= v.id %>/edit">edit</a> |
         <form action="/admin/videos/<%= v.id %>?_method=DELETE" method="post" style="display:inline;">
+          <%- include('../../partials/csrf-field') %>
           <button type="submit" class="link-button">delete</button>
         </form>
         <div class="membership-panel" style="display:none;">
           <form method="post" action="/admin/videos/<%= v.id %>/playlists">
+            <%- include('../../partials/csrf-field') %>
             <% if (playlists && playlists.length) { %>
               <% playlists.forEach(p => { %>
                 <label style="display:block; font-size:0.85rem;">

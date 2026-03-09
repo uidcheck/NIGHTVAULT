@@ -4,6 +4,7 @@
 <h2>Edit Gallery Collection</h2>
 
 <form action="/admin/collections/gallery/<%= collection.id %>?_method=PUT" method="post" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title" value="<%= collection.title %>" required></label>
   <label>Description: <textarea name="description"><%= collection.description || '' %></textarea></label>
   <button type="submit">Update Collection</button>

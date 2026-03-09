@@ -3,6 +3,7 @@
 <a href="/admin/gallery" class="back-link">&larr; Back to gallery management</a>
 <h2>Upload Image</h2>
 <form action="/admin/gallery" method="post" enctype="multipart/form-data" class="admin-form">
+  <%- include('../../partials/csrf-field') %>
   <label>Title: <input type="text" name="title"></label>
   <label>Caption:<textarea name="caption"></textarea></label>
   <label>Category: <input type="text" name="category"></label>
