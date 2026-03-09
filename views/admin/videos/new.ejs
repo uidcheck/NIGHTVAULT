@@ -7,8 +7,8 @@
   <label>Title: <input type="text" name="title" required></label>
   <label>Description:<textarea name="description"></textarea></label>
   <label>Category: <input type="text" name="category"></label>
-  <label>Video File: <input type="file" name="file" accept="video/*"></label>
-  <label>Embed URL: <input type="text" name="embed_url" placeholder="https://..."></label>
+  <label>Video File: <input type="file" name="file" accept="video/*" required></label>
+  <p style="font-size:0.8rem;color:#888; margin-top:-0.5rem;">Upload a local video file. External/embed URLs are no longer supported.</p>
   <% if (playlists && playlists.length) { %>
     <label>Playlists:
       <select name="playlists" multiple size="4">

@@ -8,7 +8,11 @@
   <label>Description:<textarea name="description"><%= video.description %></textarea></label>
   <label>Category: <input type="text" name="category" value="<%= video.category %>"></label>
   <label>Video File: <input type="file" name="file" accept="video/*"></label>
-  <label>Embed URL: <input type="text" name="embed_url" value="<%= video.embed_url %>"></label>
+  <% if (video.filename) { %>
+    <p style="font-size:0.8rem;color:#888; margin-top:-0.5rem;">Leave the file field empty to keep the current uploaded video, or choose a new file to replace it.</p>
+  <% } else { %>
+    <p style="font-size:0.8rem;color:#f2b8b8; margin-top:-0.5rem;">This record does not have a local video file. Upload one now to keep it, or delete the record.</p>
+  <% } %>
   <% if (playlists && playlists.length) { %>
     <label>Playlists:
       <select name="playlists" multiple size="4">

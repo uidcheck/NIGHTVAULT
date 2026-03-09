@@ -54,17 +54,27 @@ router.get('/videos', async (req, res) => {
   const playlists = await db.all('SELECT * FROM video_playlists ORDER BY title');
   for (const pl of playlists) {
     pl.items = await db.all(
-      'SELECT v.* FROM videos v JOIN video_playlist_items vpi ON vpi.video_id = v.id WHERE vpi.playlist_id = ? ORDER BY vpi.order_index',
+      `SELECT v.*
+       FROM videos v
+       JOIN video_playlist_items vpi ON vpi.video_id = v.id
+       WHERE vpi.playlist_id = ?
+         AND v.filename IS NOT NULL
+         AND TRIM(v.filename) != ''
+       ORDER BY vpi.order_index`,
       pl.id
     );
   }
 
-  let sql = 'SELECT * FROM videos';
+  let sql = `SELECT * FROM videos
+             WHERE filename IS NOT NULL
+               AND TRIM(filename) != ''`;
   const params = [];
   if (req.query.playlist) {
     sql = `SELECT v.* FROM videos v
            JOIN video_playlist_items vpi ON vpi.video_id = v.id
-           WHERE vpi.playlist_id = ?`;
+           WHERE vpi.playlist_id = ?
+             AND v.filename IS NOT NULL
+             AND TRIM(v.filename) != ''`;
     params.push(req.query.playlist);
     if (req.query.search) {
       sql += ' AND (v.title LIKE ? OR v.description LIKE ?)';
@@ -212,7 +222,15 @@ router.get('/search', async (req, res) => {
   // Search music
   results.music = await db.all('SELECT * FROM music WHERE title LIKE ? OR artist LIKE ? OR album LIKE ?', `%${query}%`, `%${query}%`, `%${query}%`);
   // Search videos
-  results.videos = await db.all('SELECT * FROM videos WHERE title LIKE ? OR description LIKE ?', `%${query}%`, `%${query}%`);
+  results.videos = await db.all(
+    `SELECT *
+     FROM videos
+     WHERE filename IS NOT NULL
+       AND TRIM(filename) != ''
+       AND (title LIKE ? OR description LIKE ?)`,
+    `%${query}%`,
+    `%${query}%`
+  );
   // Search gallery
   results.gallery = await db.all('SELECT * FROM gallery WHERE title LIKE ? OR caption LIKE ?', `%${query}%`, `%${query}%`);
   // Search projects
@@ -223,7 +241,14 @@ router.get('/search', async (req, res) => {
 
 router.get('/videos/:id', async (req, res) => {
   const db = req.app.locals.db;
-  const video = await db.get('SELECT * FROM videos WHERE id = ?', parseInt(req.params.id));
+  const video = await db.get(
+    `SELECT *
+     FROM videos
+     WHERE id = ?
+       AND filename IS NOT NULL
+       AND TRIM(filename) != ''`,
+    parseInt(req.params.id, 10)
+  );
   if (!video) return res.status(404).render('404');
   res.render('video_detail', { video });
 });

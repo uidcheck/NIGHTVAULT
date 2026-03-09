@@ -12,10 +12,6 @@
         Your browser does not support the video tag.
       </video>
     </div>
-  <% } else if (video.embed_url) { %>
-    <div class="embed-container">
-      <iframe src="<%= video.embed_url %>" frameborder="0" allowfullscreen></iframe>
-    </div>
   <% } %>
   
   <% if (video.description) { %>

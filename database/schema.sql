@@ -24,8 +24,7 @@ CREATE TABLE IF NOT EXISTS videos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   description TEXT,
-  filename TEXT,
-  embed_url TEXT,
+  filename TEXT NOT NULL,
   thumbnail TEXT,
   category TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP

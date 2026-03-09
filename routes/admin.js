@@ -958,8 +958,14 @@ router.get('/videos/new', async (req, res) => {
 
 router.post('/videos', uploadVideoFields, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
-  const { title, description, embed_url, category, playlists } = req.body;
+  const { title, description, category, playlists } = req.body;
   const filename = req.files && req.files.file ? req.files.file[0].filename : null;
+
+  if (!filename) {
+    req.flash('error', 'A local video file is required. External embeds are no longer supported.');
+    return res.redirect('/admin/videos/new');
+  }
+
   let thumbnail = null;
   
   // generate thumbnail from video if provided
@@ -977,8 +983,8 @@ router.post('/videos', uploadVideoFields, validateCsrfToken, async (req, res) =>
   }
   
   const result = await db.run(
-    'INSERT INTO videos (title, description, filename, embed_url, thumbnail, category) VALUES (?,?,?,?,?,?)',
-    title, description, filename, embed_url, thumbnail, category
+    'INSERT INTO videos (title, description, filename, thumbnail, category) VALUES (?,?,?,?,?)',
+    title, description, filename, thumbnail, category
   );
   const videoId = result.lastID;
   if (videoId && playlists) {
@@ -1005,9 +1011,19 @@ router.get('/videos/:id/edit', async (req, res) => {
 
 router.put('/videos/:id', uploadVideoFields, validateCsrfToken, async (req, res) => {
   const db = req.app.locals.db;
-  const { title, description, embed_url, category, playlists } = req.body;
+  const { title, description, category, playlists } = req.body;
   const file = req.files && req.files.file ? req.files.file[0].filename : null;
   const video = await db.get('SELECT * FROM videos WHERE id = ?', req.params.id);
+
+  if (!video) {
+    req.flash('error', 'Video not found');
+    return res.redirect('/admin/videos');
+  }
+
+  if (!file && !video.filename) {
+    req.flash('error', 'This legacy embedded video no longer has a playable local file. Upload a video file to keep it.');
+    return res.redirect(`/admin/videos/${req.params.id}/edit`);
+  }
   
   // Delete old video file if being replaced
   if (file && video.filename && file !== video.filename) {
@@ -1039,8 +1055,8 @@ router.put('/videos/:id', uploadVideoFields, validateCsrfToken, async (req, res)
   
   const cat = category || video.category;
   await db.run(
-    'UPDATE videos SET title=?, description=?, filename=?, embed_url=?, thumbnail=?, category=? WHERE id=?',
-    title, description, filename, embed_url, thumbnail, cat, req.params.id
+    'UPDATE videos SET title=?, description=?, filename=?, thumbnail=?, category=? WHERE id=?',
+    title, description, filename, thumbnail, cat, req.params.id
   );
   // update playlist items
   await db.run('DELETE FROM video_playlist_items WHERE video_id = ?', req.params.id);
