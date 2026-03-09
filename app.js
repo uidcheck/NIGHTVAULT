@@ -12,6 +12,7 @@ const ffmpegStatic = require('ffmpeg-static');
 const ffprobeStatic = require('ffprobe-static');
 const { DB_FILE_PATH, ensureDbDirectoryExists } = require('./database/db-config');
 const SqliteSessionStore = require('./database/sqlite-session-store');
+const { ensureArchiveVariant, getArchiveImageUrl } = require('./utils/image-variants');
 
 ffmpeg.setFfmpegPath(ffmpegStatic);
 ffmpeg.setFfprobePath(ffprobeStatic.path);
@@ -71,6 +72,24 @@ const { ensureAdmin } = require('./middleware/auth');
     }
   }
 
+  async function ensureArchiveVariants(rows, subdir, fieldName) {
+    const seen = new Set();
+    for (const row of rows) {
+      const filename = row[fieldName];
+      if (!filename || seen.has(filename)) continue;
+      seen.add(filename);
+      try {
+        await ensureArchiveVariant(subdir, filename);
+      } catch (err) {
+        console.error(`Failed to generate archive variant for ${subdir}/${filename}:`, err.message);
+      }
+    }
+  }
+
+  await ensureArchiveVariants(await db.all('SELECT cover_image FROM music WHERE cover_image IS NOT NULL'), 'music', 'cover_image');
+  await ensureArchiveVariants(await db.all('SELECT filename FROM gallery WHERE filename IS NOT NULL'), 'images', 'filename');
+  await ensureArchiveVariants(await db.all('SELECT hero_image FROM projects WHERE hero_image IS NOT NULL'), 'projects', 'hero_image');
+
   // ============================================================================
   // Ensure default admin account exists (idempotent)
   // ============================================================================
@@ -93,6 +112,7 @@ const { ensureAdmin } = require('./middleware/auth');
   // make db available via app.locals
   const app = express();
   app.locals.db = db;
+  app.locals.getArchiveImageUrl = getArchiveImageUrl;
 
   // view engine
   app.set('views', path.join(__dirname, 'views'));
@@ -100,7 +120,10 @@ const { ensureAdmin } = require('./middleware/auth');
 
   // static
   app.use(express.static(path.join(__dirname, 'public')));
-  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    maxAge: '30d',
+    immutable: true,
+  }));
 
   // parsers
   app.use(express.urlencoded({ extended: true }));

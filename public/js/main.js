@@ -8,6 +8,11 @@ let autoplayEnabled = localStorage.getItem('musicAutoplay') === 'true';
 let isPlayerReady = false;
 let isScrubbing = false;
 let hasRestoredFromStorage = false;
+let isRestoringPlayerState = false;
+let playerLabelState = 'idle';
+let trackChangeSequence = 0;
+let activeTrackChange = null;
+let lastHandledFinish = null;
 let saveTimer = null;
 const PLAYER_STATE_KEY = 'paracausalPlayerState.v2';
 
@@ -37,6 +42,183 @@ function getNowPlayingText() {
   return nowPlaying ? (nowPlaying.textContent || '').trim() : '';
 }
 
+function normalizeTrack(track) {
+  if (!track || !track.filename) return null;
+
+  return {
+    filename: track.filename,
+    title: (track.title || track.filename || '').trim(),
+    artist: (track.artist || '').trim(),
+    id: track.id || null
+  };
+}
+
+function getTrackLabel(track) {
+  const normalizedTrack = normalizeTrack(track);
+  if (!normalizedTrack) return 'No track';
+  return normalizedTrack.artist
+    ? `${normalizedTrack.title} - ${normalizedTrack.artist}`
+    : normalizedTrack.title;
+}
+
+function getCurrentTrackData() {
+  if (!currentTrackFilename) return null;
+  return queue.find((track) => track && track.filename === currentTrackFilename) || null;
+}
+
+function refreshPlayerUI(fallbackText = 'No track') {
+  const { nowPlaying } = getPlayerEls();
+  if (!nowPlaying) return;
+
+  const currentTrack = getCurrentTrackData();
+  if (playerLabelState === 'unavailable') {
+    nowPlaying.textContent = 'Track unavailable';
+    return;
+  }
+
+  if (currentTrack) {
+    nowPlaying.textContent = getTrackLabel(currentTrack);
+    return;
+  }
+
+  nowPlaying.textContent = currentTrackFilename || fallbackText;
+}
+
+function setNowPlayingTrack(track, fallbackText = 'No track') {
+  const normalizedTrack = normalizeTrack(track);
+  playerLabelState = normalizedTrack ? 'active' : (fallbackText === 'Track unavailable' ? 'unavailable' : 'idle');
+  refreshPlayerUI(fallbackText);
+}
+
+function getActiveMediaSnapshot() {
+  const media = wavesurfer && wavesurfer.backend ? wavesurfer.backend.media : null;
+  return {
+    media,
+    currentSrc: media && media.currentSrc ? media.currentSrc : '',
+    hasError: !!(media && media.error),
+    readyState: media ? media.readyState : 0,
+  };
+}
+
+function getFilenameFromMediaSrc(src) {
+  if (!src) return '';
+
+  const marker = '/uploads/music/';
+  const markerIndex = src.indexOf(marker);
+  if (markerIndex === -1) return '';
+
+  const pathRemainder = src.slice(markerIndex + marker.length);
+  return pathRemainder.split('?')[0].trim();
+}
+
+function getActiveMediaFilename() {
+  return getFilenameFromMediaSrc(getActiveMediaSnapshot().currentSrc);
+}
+
+function shouldHandleFinishEvent() {
+  const finishedFilename = getActiveMediaFilename() || currentTrackFilename;
+  if (!finishedFilename) return false;
+
+  if (activeTrackChange && activeTrackChange.source === 'autoplay-finish') {
+    return false;
+  }
+
+  if (
+    activeTrackChange &&
+    activeTrackChange.source === 'autoplay-finish' &&
+    activeTrackChange.fromFilename === finishedFilename
+  ) {
+    return false;
+  }
+
+  const now = Date.now();
+  if (
+    lastHandledFinish &&
+    lastHandledFinish.filename === finishedFilename &&
+    now - lastHandledFinish.at < 2000
+  ) {
+    return false;
+  }
+
+  lastHandledFinish = { filename: finishedFilename, at: now };
+  return true;
+}
+
+function getTrackUrlFragment(filename) {
+  return filename ? `/uploads/music/${filename}` : '';
+}
+
+function shouldIgnoreWaveSurferError(failedFilename = '') {
+  const expectedUrl = getTrackUrlFragment(failedFilename || currentTrackFilename);
+  if (!expectedUrl) return false;
+
+  const { currentSrc, hasError, readyState } = getActiveMediaSnapshot();
+  const mediaFilename = getActiveMediaFilename();
+
+  if (currentSrc.includes(expectedUrl) && !hasError && readyState > 0) {
+    return true;
+  }
+
+  if (!activeTrackChange) return false;
+
+  const previousUrl = getTrackUrlFragment(activeTrackChange.fromFilename);
+  const targetUrl = getTrackUrlFragment(activeTrackChange.track && activeTrackChange.track.filename);
+  const previousFilename = activeTrackChange.fromFilename || '';
+  const targetFilename = activeTrackChange.track && activeTrackChange.track.filename
+    ? activeTrackChange.track.filename
+    : '';
+
+  if (mediaFilename && targetFilename && mediaFilename !== targetFilename) {
+    return true;
+  }
+
+  if (mediaFilename && previousFilename && mediaFilename === previousFilename) {
+    return true;
+  }
+
+  // Ignore teardown/abort noise from the track we just left while a new one is loading.
+  if (previousUrl && currentSrc.includes(previousUrl) && (!targetUrl || !currentSrc.includes(targetUrl))) {
+    return true;
+  }
+
+  // Ignore transient swap states until the new media element reports a real error.
+  if (!currentSrc && !hasError) {
+    return true;
+  }
+
+  return false;
+}
+
+function clearActiveTrackChange(changeId = null) {
+  if (!activeTrackChange) return;
+  if (changeId !== null && activeTrackChange.id !== changeId) return;
+  activeTrackChange = null;
+}
+
+function removeTrackFromQueue(filename) {
+  if (!filename) return -1;
+
+  const failedIndex = queue.findIndex((track) => track && track.filename === filename);
+  if (failedIndex === -1) return -1;
+
+  queue.splice(failedIndex, 1);
+
+  if (queue.length === 0) {
+    currentTrackIndex = -1;
+    currentTrackFilename = null;
+    return -1;
+  }
+
+  if (failedIndex < currentTrackIndex) {
+    currentTrackIndex -= 1;
+  } else if (failedIndex === currentTrackIndex) {
+    currentTrackIndex = Math.min(failedIndex, queue.length - 1);
+    currentTrackFilename = queue[currentTrackIndex] ? queue[currentTrackIndex].filename : null;
+  }
+
+  return failedIndex;
+}
+
 function queueSavePlayerState() {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(savePlayerState, 120);
@@ -44,14 +226,17 @@ function queueSavePlayerState() {
 
 function savePlayerState() {
   if (!wavesurfer) return;
+  if (isRestoringPlayerState) return;
 
   const { volumeSlider } = getPlayerEls();
   const volume = wavesurfer.getVolume ? wavesurfer.getVolume() : parseFloat(volumeSlider ? volumeSlider.value : '0.5');
   const currentTime = isPlayerReady ? wavesurfer.getCurrentTime() : 0;
+  const currentTrack = getCurrentTrackData();
 
   const state = {
     filename: currentTrackFilename,
-    title: getNowPlayingText(),
+    title: currentTrack ? getTrackLabel(currentTrack) : getNowPlayingText(),
+    track: currentTrack ? { ...currentTrack } : null,
     currentTime: Number.isFinite(currentTime) ? currentTime : 0,
     wasPlaying: !!(wavesurfer.isPlaying && wavesurfer.isPlaying()),
     volume: Number.isFinite(volume) ? volume : 0.5,
@@ -128,130 +313,132 @@ async function filterValidTracks(queueToValidate) {
 async function restorePlayerStateIfNeeded() {
   if (!wavesurfer || hasRestoredFromStorage) return;
   hasRestoredFromStorage = true;
+  isRestoringPlayerState = true;
 
-  const state = loadPlayerState();
-  if (!state || !state.filename) return;
+  try {
+    const state = loadPlayerState();
+    if (!state || !state.filename) return;
 
-  const {
-    volumeSlider,
-    autoplayCheckbox,
-    nowPlaying,
-    currentTimeSpan,
-    durationSpan
-  } = getPlayerEls();
+    const {
+      volumeSlider,
+      autoplayCheckbox,
+      currentTimeSpan,
+      durationSpan
+    } = getPlayerEls();
 
-  // Restore volume
-  if (Number.isFinite(state.volume)) {
-    const clampedVolume = Math.min(1, Math.max(0, state.volume));
-    if (volumeSlider) volumeSlider.value = clampedVolume;
-    wavesurfer.setVolume(clampedVolume);
-  }
+    // Restore volume
+    if (Number.isFinite(state.volume)) {
+      const clampedVolume = Math.min(1, Math.max(0, state.volume));
+      if (volumeSlider) volumeSlider.value = clampedVolume;
+      wavesurfer.setVolume(clampedVolume);
+    }
 
-  // Restore autoplay
-  autoplayEnabled = !!state.autoplayEnabled;
-  localStorage.setItem('musicAutoplay', autoplayEnabled ? 'true' : 'false');
-  if (autoplayCheckbox) autoplayCheckbox.checked = autoplayEnabled;
+    // Restore autoplay
+    autoplayEnabled = !!state.autoplayEnabled;
+    localStorage.setItem('musicAutoplay', autoplayEnabled ? 'true' : 'false');
+    if (autoplayCheckbox) autoplayCheckbox.checked = autoplayEnabled;
 
-  // Validate and restore queue - filter out deleted tracks
-  let validatedQueue = [];
-  if (Array.isArray(state.queue) && state.queue.length > 0) {
-    console.log(`Validating ${state.queue.length} tracks in saved queue...`);
-    validatedQueue = await filterValidTracks(state.queue);
-    console.log(`Queue validation complete: ${validatedQueue.length} valid tracks`);
-    
-    if (validatedQueue.length > 0) {
-      queue = validatedQueue;
-      queueSource = state.queueSource || null;
-    } else {
-      // All tracks were deleted, clear the queue
-      queue = [];
-      queueSource = null;
-      currentTrackFilename = null;
-      currentTrackIndex = -1;
-      if (nowPlaying) nowPlaying.textContent = 'No track';
-      console.log('All saved tracks were deleted. Queue cleared.');
+    // Validate and restore queue - filter out deleted tracks
+    let validatedQueue = [];
+    if (Array.isArray(state.queue) && state.queue.length > 0) {
+      console.log(`Validating ${state.queue.length} tracks in saved queue...`);
+      validatedQueue = (await filterValidTracks(state.queue)).map(normalizeTrack).filter(Boolean);
+      console.log(`Queue validation complete: ${validatedQueue.length} valid tracks`);
+
+      if (validatedQueue.length > 0) {
+        queue = validatedQueue;
+        queueSource = state.queueSource || null;
+      } else {
+        queue = [];
+        queueSource = null;
+        currentTrackFilename = null;
+        currentTrackIndex = -1;
+        playerLabelState = 'idle';
+        setNowPlayingTrack(null);
+        console.log('All saved tracks were deleted. Queue cleared.');
+        return;
+      }
+    }
+
+    const currentTrackExists = await validateTrackExists(state.filename);
+    if (!currentTrackExists) {
+      console.log(`Current track deleted: ${state.title || state.filename}`);
+
+      if (validatedQueue.length > 0) {
+        console.log('Loading first valid track from queue...');
+        currentTrackFilename = validatedQueue[0].filename;
+        currentTrackIndex = 0;
+        playerLabelState = 'active';
+        setNowPlayingTrack(validatedQueue[0]);
+
+        wavesurfer.load(`/uploads/music/${validatedQueue[0].filename}?t=${Date.now()}`);
+        wavesurfer.once('ready', () => {
+          if (durationSpan) durationSpan.textContent = formatTime(wavesurfer.getDuration());
+          if (currentTimeSpan) currentTimeSpan.textContent = formatTime(0);
+          wavesurfer.pause();
+          refreshPlayerUI();
+          updatePlayPauseLabel();
+          syncActiveTrackCard();
+          queueSavePlayerState();
+        });
+      } else {
+        currentTrackFilename = null;
+        currentTrackIndex = -1;
+        playerLabelState = 'idle';
+        setNowPlayingTrack(null);
+      }
       return;
     }
-  }
 
-  // Validate the current track still exists
-  const currentTrackExists = await validateTrackExists(state.filename);
-  
-  if (!currentTrackExists) {
-    console.log(`Current track deleted: ${state.title || state.filename}`);
-    
-    // Find next valid track in queue
-    if (validatedQueue.length > 0) {
-      console.log('Loading first valid track from queue...');
-      currentTrackFilename = validatedQueue[0].filename;
-      currentTrackIndex = 0;
-      if (nowPlaying) nowPlaying.textContent = validatedQueue[0].title || validatedQueue[0].filename;
-      
-      // Load the first valid track but don't auto-play it
-      wavesurfer.load(`/uploads/music/${validatedQueue[0].filename}?t=${Date.now()}`);
-      wavesurfer.once('ready', () => {
-        if (durationSpan) durationSpan.textContent = formatTime(wavesurfer.getDuration());
-        if (currentTimeSpan) currentTimeSpan.textContent = formatTime(0);
+    currentTrackFilename = state.filename;
+    if (Number.isInteger(state.trackIndex) && state.trackIndex >= 0 && state.trackIndex < queue.length) {
+      currentTrackIndex = state.trackIndex;
+    } else {
+      currentTrackIndex = queue.findIndex((track) => track.filename === state.filename);
+    }
+
+    const restoredTrack = getCurrentTrackData() || normalizeTrack(state.track);
+    playerLabelState = restoredTrack ? 'active' : 'idle';
+    setNowPlayingTrack(restoredTrack, state.title || state.filename);
+
+    const isAlreadyPlaying = isPlayerReady && wavesurfer.isPlaying && wavesurfer.isPlaying();
+    const currentUrl = wavesurfer.backend && wavesurfer.backend.media ? wavesurfer.backend.media.currentSrc : '';
+    const targetUrl = `/uploads/music/${state.filename}`;
+    const isSameTrack = currentUrl.includes(targetUrl);
+
+    if (isAlreadyPlaying && isSameTrack) {
+      refreshPlayerUI();
+      updatePlayPauseLabel();
+      syncActiveTrackCard();
+      queueSavePlayerState();
+      return;
+    }
+
+    wavesurfer.load(`/uploads/music/${state.filename}?t=${Date.now()}`);
+    wavesurfer.once('ready', () => {
+      const duration = wavesurfer.getDuration() || 0;
+      const targetTime = Number.isFinite(state.currentTime) ? state.currentTime : 0;
+      if (duration > 0 && targetTime > 0) {
+        const ratio = Math.min(1, Math.max(0, targetTime / duration));
+        wavesurfer.seekTo(ratio);
+      }
+
+      if (durationSpan) durationSpan.textContent = formatTime(duration);
+      if (currentTimeSpan) currentTimeSpan.textContent = formatTime(wavesurfer.getCurrentTime());
+
+      if (state.wasPlaying) {
+        wavesurfer.play();
+      } else {
         wavesurfer.pause();
-        updatePlayPauseLabel();
-        syncActiveTrackCard();
-        queueSavePlayerState();
-      });
-    } else {
-      // No valid tracks, clear everything
-      currentTrackFilename = null;
-      currentTrackIndex = -1;
-      if (nowPlaying) nowPlaying.textContent = 'No track';
-    }
-    return;
+      }
+      refreshPlayerUI();
+      updatePlayPauseLabel();
+      syncActiveTrackCard();
+      queueSavePlayerState();
+    });
+  } finally {
+    isRestoringPlayerState = false;
   }
-
-  // Current track still exists, restore it
-  currentTrackFilename = state.filename;
-  if (Number.isInteger(state.trackIndex) && state.trackIndex >= 0 && state.trackIndex < queue.length) {
-    currentTrackIndex = state.trackIndex;
-  } else {
-    // Try to find index in the validated queue
-    currentTrackIndex = queue.findIndex(t => t.filename === state.filename);
-  }
-
-  if (nowPlaying) nowPlaying.textContent = state.title || state.filename;
-
-  // Check if music is already playing/loaded - if so, don't reload to avoid interruption
-  const isAlreadyPlaying = isPlayerReady && wavesurfer.isPlaying && wavesurfer.isPlaying();
-  const currentUrl = wavesurfer.backend && wavesurfer.backend.media ? wavesurfer.backend.media.currentSrc : '';
-  const targetUrl = `/uploads/music/${state.filename}`;
-  const isSameTrack = currentUrl.includes(targetUrl);
-
-  if (isAlreadyPlaying && isSameTrack) {
-    // Track already playing, just sync UI state without reloading
-    updatePlayPauseLabel();
-    syncActiveTrackCard();
-    queueSavePlayerState();
-    return;
-  }
-
-  wavesurfer.load(`/uploads/music/${state.filename}?t=${Date.now()}`);
-  wavesurfer.once('ready', () => {
-    const duration = wavesurfer.getDuration() || 0;
-    const targetTime = Number.isFinite(state.currentTime) ? state.currentTime : 0;
-    if (duration > 0 && targetTime > 0) {
-      const ratio = Math.min(1, Math.max(0, targetTime / duration));
-      wavesurfer.seekTo(ratio);
-    }
-
-    if (durationSpan) durationSpan.textContent = formatTime(duration);
-    if (currentTimeSpan) currentTimeSpan.textContent = formatTime(wavesurfer.getCurrentTime());
-
-    if (state.wasPlaying) {
-      wavesurfer.play();
-    } else {
-      wavesurfer.pause();
-    }
-    updatePlayPauseLabel();
-    syncActiveTrackCard();
-    queueSavePlayerState();
-  });
 }
 
 function initFullReloadPersistence() {
@@ -297,41 +484,62 @@ function syncActiveTrackCard() {
   });
 }
 
-function playTrack(index, shouldAutoplay = true) {
+function transitionToTrack(index, shouldAutoplay = true, source = 'direct') {
   if (!wavesurfer || index < 0 || index >= queue.length) return;
 
-  const trackData = queue[index];
+  const trackData = normalizeTrack(queue[index]);
   if (!trackData || !trackData.filename) return;
-
-  const { nowPlaying } = getPlayerEls();
+  const changeId = ++trackChangeSequence;
+  const fromFilename = currentTrackFilename;
 
   // Update visual state for DOM cards if on music page
   tracks.forEach(t => t.classList.remove('active'));
   const matchingCard = tracks.find(t => t.dataset.filename === trackData.filename);
   if (matchingCard) matchingCard.classList.add('active');
 
+  queue[index] = trackData;
   currentTrackIndex = index;
   currentTrackFilename = trackData.filename;
-  if (nowPlaying) nowPlaying.textContent = trackData.title || trackData.filename;
+  if (!lastHandledFinish || lastHandledFinish.filename !== trackData.filename) {
+    lastHandledFinish = null;
+  }
+  playerLabelState = 'active';
+  activeTrackChange = {
+    id: changeId,
+    source,
+    index,
+    fromFilename,
+    track: trackData,
+    shouldAutoplay,
+  };
+  setNowPlayingTrack(trackData);
 
   wavesurfer.load(`/uploads/music/${trackData.filename}?t=${Date.now()}`);
   wavesurfer.once('ready', () => {
+    if (!activeTrackChange || activeTrackChange.id !== changeId) return;
+    clearActiveTrackChange(changeId);
     if (shouldAutoplay) wavesurfer.play();
+    refreshPlayerUI();
     updatePlayPauseLabel();
+    syncActiveTrackCard();
     queueSavePlayerState();
   });
   queueSavePlayerState();
 }
 
-function nextTrack() {
+function playTrack(index, shouldAutoplay = true) {
+  transitionToTrack(index, shouldAutoplay, 'playTrack');
+}
+
+function nextTrack(source = 'manual-next') {
   if (queue.length && currentTrackIndex < queue.length - 1) {
-    playTrack(currentTrackIndex + 1, true);
+    transitionToTrack(currentTrackIndex + 1, true, source);
   }
 }
 
-function prevTrack() {
+function prevTrack(source = 'manual-prev') {
   if (queue.length && currentTrackIndex > 0) {
-    playTrack(currentTrackIndex - 1, true);
+    transitionToTrack(currentTrackIndex - 1, true, source);
   }
 }
 
@@ -403,6 +611,7 @@ function bindPlayerControls() {
     wavesurfer.on('ready', () => {
       isPlayerReady = true;
       durationSpan.textContent = formatTime(wavesurfer.getDuration());
+      refreshPlayerUI();
       updatePlayPauseLabel();
     });
 
@@ -415,40 +624,59 @@ function bindPlayerControls() {
     });
 
     wavesurfer.on('finish', () => {
-      if (autoplayEnabled) nextTrack();
+      if (autoplayEnabled && shouldHandleFinishEvent()) {
+        nextTrack('autoplay-finish');
+      }
+      refreshPlayerUI();
       updatePlayPauseLabel();
     });
 
-    wavesurfer.on('play', updatePlayPauseLabel);
-    wavesurfer.on('pause', updatePlayPauseLabel);
+    wavesurfer.on('play', () => {
+      refreshPlayerUI();
+      updatePlayPauseLabel();
+    });
+    wavesurfer.on('pause', () => {
+      refreshPlayerUI();
+      updatePlayPauseLabel();
+    });
     
     // Handle track load errors (e.g., deleted files, 404s)
     wavesurfer.on('error', (err) => {
       console.error('WaveSurfer error:', err);
-      const { nowPlaying } = getPlayerEls();
+
+      const mediaFilename = getActiveMediaFilename();
+      const failedTrack = activeTrackChange && activeTrackChange.track
+        ? activeTrackChange.track
+        : getCurrentTrackData();
+      const failedFilename = mediaFilename || (failedTrack && failedTrack.filename ? failedTrack.filename : currentTrackFilename);
+
+      if (shouldIgnoreWaveSurferError(failedFilename)) {
+        console.warn('Ignoring stale WaveSurfer error for active track');
+        playerLabelState = 'active';
+        refreshPlayerUI();
+        return;
+      }
       
       // If current track failed to load, try next track or clear player
-      if (currentTrackFilename) {
-        console.log(`Failed to load track: ${currentTrackFilename}`);
+      if (failedFilename) {
+        console.log(`Failed to load track: ${failedFilename}`);
+        const failedIndex = removeTrackFromQueue(failedFilename);
+        clearActiveTrackChange();
         
-        // Remove failed track from queue
-        if (currentTrackIndex >= 0 && currentTrackIndex < queue.length) {
-          queue.splice(currentTrackIndex, 1);
-          console.log(`Removed failed track from queue`);
+        if (failedIndex >= 0) {
+          console.log('Removed failed track from queue');
         }
         
         // Try to play next track if available
-        if (queue.length > 0 && currentTrackIndex < queue.length) {
+        if (queue.length > 0 && currentTrackIndex >= 0 && currentTrackIndex < queue.length) {
           console.log('Attempting to play next track...');
-          playTrack(currentTrackIndex, false);
-        } else if (queue.length > 0 && currentTrackIndex > 0) {
-          console.log('Attempting to play previous track...');
-          playTrack(0, false);
+          transitionToTrack(currentTrackIndex, autoplayEnabled, 'error-recovery');
         } else {
           // No valid tracks, clear player
           currentTrackFilename = null;
           currentTrackIndex = -1;
-          if (nowPlaying) nowPlaying.textContent = 'Track unavailable';
+          playerLabelState = 'unavailable';
+          refreshPlayerUI('Track unavailable');
           queueSavePlayerState();
         }
       }
@@ -509,12 +737,12 @@ function buildQueueFromDOMCards() {
   
   cards.forEach((card) => {
     const filename = card.dataset.filename;
-    const titleEl = card.querySelector('h3');
-    const title = titleEl ? titleEl.innerText.trim() : filename;
+    const title = (card.dataset.title || '').trim();
+    const artist = (card.dataset.artist || '').trim();
     const id = card.dataset.musicId || null; // if music_id is available
     
     if (filename) {
-      queueData.push({ filename, title, id });
+      queueData.push(normalizeTrack({ filename, title, artist, id }));
     }
   });
   
@@ -542,15 +770,19 @@ function initMusicPageFeatures() {
   const pageQueue = buildQueueFromDOMCards();
   const pageSource = detectQueueSource();
   
-  // Only update queue if we're on /music and have cards
-  // OR if there's no queue yet (first load)
-  if (pageQueue.length > 0 && (window.location.pathname === '/music' || queue.length === 0)) {
+  // Do not replace an active queue just because filtered results rendered.
+  // The visible archive can change independently from the currently playing queue.
+  if (pageQueue.length > 0 && queue.length === 0 && !currentTrackFilename) {
     queue = pageQueue;
     queueSource = pageSource;
   }
 
   tracks.forEach((item, index) => {
-    item.addEventListener('click', () => playTrack(index, true));
+    item.addEventListener('click', () => {
+      queue = pageQueue.slice();
+      queueSource = pageSource;
+      playTrack(index, true);
+    });
   });
 
   const playlistHeaders = document.querySelectorAll('.playlist-item .playlist-header');
@@ -561,9 +793,9 @@ function initMusicPageFeatures() {
     });
   });
 
-  // Sync current track index when returning to /music page
+  // Sync current track index against the active queue without mutating it.
   if (currentTrackFilename && queue.length > 0) {
-    const currentIndex = queue.findIndex(t => t.filename === currentTrackFilename);
+    const currentIndex = queue.findIndex((t) => t.filename === currentTrackFilename);
     if (currentIndex >= 0) {
       currentTrackIndex = currentIndex;
     }
@@ -675,6 +907,7 @@ function initPageFeatures() {
   initVideoControls();
   initGalleryLightbox();
   initAdminMembershipToggles();
+  refreshPlayerUI();
   syncActiveTrackCard();
   queueSavePlayerState();
 }
@@ -716,6 +949,14 @@ async function softSubmitForm(form) {
   // Prevent default browser submit, handle via fetch to keep player alive
   const method = form.method.toUpperCase() || 'POST';
   const action = form.action || window.location.href;
+
+  if (method === 'GET') {
+    const actionUrl = new URL(action, window.location.origin);
+    const params = new URLSearchParams(new FormData(form));
+    actionUrl.search = params.toString();
+    await softNavigate(actionUrl.toString());
+    return;
+  }
 
   // Non-file forms should use urlencoded bodies so Express urlencoded middleware
   // parses req.body correctly on routes that don't use multer.

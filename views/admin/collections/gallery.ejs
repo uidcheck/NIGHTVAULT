@@ -21,6 +21,7 @@
           <li>
             <strong><%= c.title %></strong>
             <% if (c.description) { %><p style="font-size: 0.85rem; color: #888; margin: 0.3rem 0;"><%= c.description %></p><% } %>
+            <a href="/admin/collections/gallery/<%= c.id %>/edit">edit</a> |
             <form action="/admin/collections/gallery/<%= c.id %>?_method=DELETE" method="post" style="display:inline;">
               <button type="submit" class="link-button">delete</button>
             </form>

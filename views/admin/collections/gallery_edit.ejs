@@ -1,0 +1,13 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin/collections/gallery" class="back-link">&larr; Back to gallery collections</a>
+<h2>Edit Gallery Collection</h2>
+
+<form action="/admin/collections/gallery/<%= collection.id %>?_method=PUT" method="post" class="admin-form">
+  <label>Title: <input type="text" name="title" value="<%= collection.title %>" required></label>
+  <label>Description: <textarea name="description"><%= collection.description || '' %></textarea></label>
+  <button type="submit">Update Collection</button>
+</form>
+
+<p style="margin-top: 1rem;"><a href="/admin/collections/gallery">&larr; Back to Gallery Collections</a></p>
+<%- include('../../partials/footer') %>

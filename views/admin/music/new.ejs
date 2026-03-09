@@ -2,25 +2,115 @@
 <%- include('../../partials/messages') %>
 <a href="/admin/music" class="back-link">&larr; Back to music management</a>
 <h2>Upload Track</h2>
-<form action="/admin/music" method="post" enctype="multipart/form-data" class="admin-form">
-  <label>Title: <input type="text" name="title" required></label>
-  <label>Artist: <input type="text" name="artist"></label>
-  <label>Album: <input type="text" name="album"></label>
-  <label>Year: <input type="number" name="year"></label>
+<form action="/admin/music" method="post" enctype="multipart/form-data" class="admin-form" id="single-upload-form">
+  <label>Title: <input type="text" name="title" data-metadata-field="title"></label>
+  <label>Artist: <input type="text" name="artist" data-metadata-field="artist"></label>
+  <label>Album: <input type="text" name="album" data-metadata-field="album"></label>
+  <label>Year: <input type="number" name="year" data-metadata-field="year"></label>
   <label>Description:<textarea name="description"></textarea></label>
-  <label>Audio File: <input type="file" name="file" accept="audio/*" required></label>
-  <label>Cover Image: <input type="file" name="cover" accept="image/*"></label>
+  <label>Audio File: <input type="file" name="file" accept="audio/*" required id="single-track-audio"></label>
+  <p id="metadata-status" style="font-size:0.8rem;color:#888; margin-top:-0.5rem;">Choose an audio file to auto-fill embedded metadata where available.</p>
+  <label>Cover Image: <input type="file" name="cover" accept="image/*" id="single-track-cover"></label>
+  <p style="font-size:0.8rem;color:#888; margin-top:-0.5rem;">Manual cover upload overrides any embedded cover found in the audio file.</p>
+  <div id="embedded-cover-preview" style="display:none; margin:0.5rem 0 1rem;">
+    <p style="font-size:0.8rem;color:#888; margin-bottom:0.5rem;">Embedded cover preview</p>
+    <img id="embedded-cover-image" alt="Embedded cover preview" style="max-width:180px; border:1px solid #333; display:block;">
+  </div>
   <label>Order Index: <input type="number" name="order_index"></label>
-  <% if (playlists && playlists.length) { %>
-    <label>Playlists:
-      <select name="playlists" multiple size="4">
+
+  <h3>Playlist Assignment</h3>
+  <label>Assign to Existing Playlist:
+    <select name="playlist_id">
+      <option value="">-- None --</option>
+      <% if (playlists && playlists.length) { %>
         <% playlists.forEach(p => { %>
           <option value="<%= p.id %>"><%= p.title %></option>
         <% }) %>
-      </select>
-    </label>
-    <p style="font-size:0.8rem;color:#888;">(hold Ctrl/Cmd to select multiple)</p>
-  <% } %>
+      <% } %>
+    </select>
+  </label>
+  <p>or</p>
+  <label>Create New Playlist: <input type="text" name="new_playlist_title" placeholder="e.g. My Album"></label>
+
   <button type="submit">Upload</button>
 </form>
+<script>
+  (() => {
+    const form = document.getElementById('single-upload-form');
+    const audioInput = document.getElementById('single-track-audio');
+    const coverInput = document.getElementById('single-track-cover');
+    const statusEl = document.getElementById('metadata-status');
+    const previewWrap = document.getElementById('embedded-cover-preview');
+    const previewImg = document.getElementById('embedded-cover-image');
+    const metadataFields = Array.from(form.querySelectorAll('[data-metadata-field]'));
+
+    function setStatus(message) {
+      if (statusEl) statusEl.textContent = message;
+    }
+
+    function setPreview(dataUrl) {
+      if (!previewWrap || !previewImg) return;
+      if (dataUrl && !coverInput.files.length) {
+        previewImg.src = dataUrl;
+        previewWrap.style.display = 'block';
+      } else {
+        previewImg.removeAttribute('src');
+        previewWrap.style.display = 'none';
+      }
+    }
+
+    function applyMetadata(metadata) {
+      metadataFields.forEach((field) => {
+        const key = field.dataset.metadataField;
+        const value = metadata && Object.prototype.hasOwnProperty.call(metadata, key) ? metadata[key] : '';
+        field.value = value || '';
+      });
+    }
+
+    coverInput.addEventListener('change', () => {
+      if (coverInput.files.length) {
+        setStatus('Manual cover selected. It will override any embedded cover on upload.');
+        setPreview(null);
+      }
+    });
+
+    audioInput.addEventListener('change', async () => {
+      const file = audioInput.files[0];
+      if (!file) {
+        applyMetadata({ title: '', artist: '', album: '', year: '' });
+        setPreview(null);
+        setStatus('Choose an audio file to auto-fill embedded metadata where available.');
+        return;
+      }
+
+      const body = new FormData();
+      body.append('file', file);
+      setStatus('Reading embedded metadata...');
+
+      try {
+        const response = await fetch('/admin/music/metadata-preview', {
+          method: 'POST',
+          body,
+          credentials: 'same-origin'
+        });
+        const payload = await response.json();
+        applyMetadata(payload.metadata || {});
+        setPreview(payload.coverPreview ? payload.coverPreview.dataUrl : null);
+
+        const hasMetadata = payload.metadata && Object.values(payload.metadata).some((value) => value);
+        if (payload.coverPreview && !coverInput.files.length) {
+          setStatus('Embedded metadata loaded. You can edit any field before upload, and the embedded cover will be used unless you choose another image.');
+        } else if (hasMetadata) {
+          setStatus('Embedded metadata loaded. You can edit any field before upload.');
+        } else {
+          setStatus('No embedded metadata found. Fill in the fields manually if needed.');
+        }
+      } catch (err) {
+        console.error('Metadata preview failed:', err);
+        setStatus('Could not read embedded metadata. You can still upload the file manually.');
+        setPreview(null);
+      }
+    });
+  })();
+</script>
 <%- include('../../partials/footer') %>

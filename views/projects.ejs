@@ -55,11 +55,11 @@
 
     <% if (projects && projects.length) { %>
       <div class="project-list">
-        <% projects.forEach(proj => { %>
+        <% projects.forEach((proj, index) => { %>
           <a href="/projects/<%= proj.slug %>" class="project-card">
             <% if (proj.hero_image) { %>
               <div class="image-container">
-                <img src="/uploads/projects/<%= proj.hero_image %>?t=<%= Date.now() %>" alt="hero" class="card-image">
+                <img src="<%= getArchiveImageUrl('projects', proj.hero_image) %>" alt="<%= proj.title %> hero" class="card-image" loading="<%= index < 4 ? 'eager' : 'lazy' %>" decoding="async" width="480" height="270">
               </div>
             <% } else { %>
               <div class="default-hero">

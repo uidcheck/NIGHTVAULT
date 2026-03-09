@@ -7,6 +7,7 @@ const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
 const mm = require('music-metadata');
+const { ensureArchiveVariant, deleteArchiveVariant } = require('../utils/image-variants');
 
 // set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -49,6 +50,7 @@ const safeDeleteFile = async (filePath) => {
  */
 const deleteUploadedFile = async (filename, subdir) => {
   if (!filename) return false;
+  await deleteArchiveVariant(subdir, filename);
   const filePath = path.join(__dirname, '..', 'uploads', subdir, filename);
   return await safeDeleteFile(filePath);
 };
@@ -170,6 +172,7 @@ const uploadMusic = multer({ storage: musicStorage });
 const uploadVideo = multer({ storage: videoStorage });
 const uploadImage = multer({ storage: imageStorage });
 const uploadProject = multer({ storage: projectStorage });
+const uploadMusicPreview = multer({ storage: multer.memoryStorage() });
 
 const documentStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/documents'),
@@ -226,6 +229,92 @@ const uploadUpdateWithDocs = multer({
   { name: 'documents', maxCount: 10 }
 ]);
 
+async function extractEmbeddedCoverFromMetadata(parsed, outputDir) {
+  if (!parsed || !parsed.common || !parsed.common.picture || parsed.common.picture.length === 0) {
+    return null;
+  }
+
+  const picture = parsed.common.picture[0];
+  const formatParts = (picture.format || '').split('/');
+  const ext = formatParts[1] || 'jpg';
+  const coverFilename = `${Date.now()}_embedded.${ext}`;
+  const coverPath = path.join(outputDir, coverFilename);
+
+  await fs.promises.writeFile(coverPath, picture.data);
+  return coverFilename;
+}
+
+function mapParsedMusicMetadata(parsed, originalname = '') {
+  const common = parsed && parsed.common ? parsed.common : {};
+  const trackNumber = common.track && Number.isFinite(common.track.no) ? common.track.no : null;
+
+  return {
+    title: common.title || path.parse(originalname || '').name || '',
+    artist: common.artist || '',
+    album: common.album || '',
+    year: common.year || '',
+    track: trackNumber,
+  };
+}
+
+async function parseMusicUploadFromFile(filePath, originalname = '', options = {}) {
+  const { extractCover = false, coverOutputDir = path.join('uploads', 'music') } = options;
+
+  const parsed = await mm.parseFile(filePath);
+  const metadata = mapParsedMusicMetadata(parsed, originalname);
+  let extractedCoverFilename = null;
+
+  if (extractCover) {
+    extractedCoverFilename = await extractEmbeddedCoverFromMetadata(parsed, coverOutputDir);
+  }
+
+  return {
+    metadata,
+    extractedCoverFilename,
+    hasEmbeddedCover: !!extractedCoverFilename || !!(parsed.common && parsed.common.picture && parsed.common.picture.length > 0),
+  };
+}
+
+async function parseMusicUploadFromBuffer(fileBuffer, originalname = '', mimeType = '') {
+  const parsed = await mm.parseBuffer(fileBuffer, mimeType ? { mimeType } : undefined, { duration: false });
+  const metadata = mapParsedMusicMetadata(parsed, originalname);
+  const picture = parsed.common && parsed.common.picture && parsed.common.picture.length > 0
+    ? parsed.common.picture[0]
+    : null;
+
+  return {
+    metadata,
+    coverPreview: picture
+      ? {
+          mimeType: picture.format || 'image/jpeg',
+          dataUrl: `data:${picture.format || 'image/jpeg'};base64,${picture.data.toString('base64')}`,
+        }
+      : null,
+  };
+}
+
+async function createMusicPlaylist(db, title, description = null) {
+  const result = await db.run('INSERT INTO music_playlists (title, description) VALUES (?, ?)', title.trim(), description || null);
+  return result.lastID;
+}
+
+async function assignTrackToPlaylist(db, playlistId, musicId, preferredOrder = null) {
+  if (!playlistId || !musicId) return;
+
+  let nextOrder = preferredOrder;
+  if (!Number.isFinite(nextOrder)) {
+    const maxOrder = await db.get('SELECT MAX(order_index) as max_order FROM music_playlist_items WHERE playlist_id = ?', playlistId);
+    nextOrder = (maxOrder && maxOrder.max_order ? maxOrder.max_order : 0) + 1;
+  }
+
+  await db.run(
+    'INSERT OR IGNORE INTO music_playlist_items (playlist_id, music_id, order_index) VALUES (?,?,?)',
+    playlistId,
+    musicId,
+    nextOrder
+  );
+}
+
 
 // dashboard overview
 router.get('/', async (req, res) => {
@@ -259,25 +348,87 @@ router.get('/music/new', async (req, res) => {
   res.render('admin/music/new', { playlists });
 });
 
+router.post('/music/metadata-preview', uploadMusicPreview.single('file'), async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'No audio file provided' });
+    }
+
+    const parsed = await parseMusicUploadFromBuffer(req.file.buffer, req.file.originalname, req.file.mimetype);
+    return res.json({
+      metadata: parsed.metadata,
+      coverPreview: parsed.coverPreview,
+    });
+  } catch (err) {
+    console.error('Single upload metadata preview error:', err);
+    return res.status(200).json({
+      metadata: {
+        title: '',
+        artist: '',
+        album: '',
+        year: '',
+        track: null,
+      },
+      coverPreview: null,
+    });
+  }
+});
+
 router.post('/music', uploadMusicFields, async (req, res) => {
   const db = req.app.locals.db;
-  const { title, artist, album, year, description, order_index, playlists } = req.body;
+  const { title, artist, album, year, description, order_index, playlist_id, new_playlist_title } = req.body;
   const filename = req.files && req.files.file ? req.files.file[0].filename : '';
-  const cover = req.files && req.files.cover ? req.files.cover[0].filename : '';
-  const result = await db.run(
-    'INSERT INTO music (title, artist, album, year, description, filename, cover_image, order_index) VALUES (?,?,?,?,?,?,?,?)',
-    title, artist, album, year, description, filename, cover, order_index || null
-  );
-  const musicId = result.lastID;
-  // if playlists were selected, add entries
-  if (musicId && playlists) {
-    const arr = Array.isArray(playlists) ? playlists : [playlists];
-    for (const pid of arr) {
-      const maxOrder = await db.get('SELECT MAX(order_index) as max_order FROM music_playlist_items WHERE playlist_id = ?', pid);
-      const nextOrder = (maxOrder.max_order || 0) + 1;
-      await db.run('INSERT OR IGNORE INTO music_playlist_items (playlist_id, music_id, order_index) VALUES (?,?,?)', pid, musicId, nextOrder);
+  const audioFile = req.files && req.files.file ? req.files.file[0] : null;
+  const manualCover = req.files && req.files.cover ? req.files.cover[0] : null;
+
+  let extractedMetadata = {
+    title: '',
+    artist: '',
+    album: '',
+    year: '',
+    track: null,
+  };
+  let cover = manualCover ? manualCover.filename : '';
+
+  if (audioFile) {
+    try {
+      const parsed = await parseMusicUploadFromFile(path.join('uploads', 'music', audioFile.filename), audioFile.originalname, {
+        extractCover: !manualCover,
+      });
+      extractedMetadata = parsed.metadata;
+      if (!manualCover && parsed.extractedCoverFilename) {
+        cover = parsed.extractedCoverFilename;
+      }
+    } catch (err) {
+      console.log('Metadata extraction failed for single upload', audioFile.originalname, err.message);
     }
   }
+
+  if (cover) {
+    await ensureArchiveVariant('music', cover);
+  }
+
+  const finalTitle = (title || '').trim() || extractedMetadata.title || (audioFile ? path.parse(audioFile.originalname).name : '');
+  const finalArtist = (artist || '').trim() || extractedMetadata.artist || null;
+  const finalAlbum = (album || '').trim() || extractedMetadata.album || null;
+  const finalYear = (year || '').toString().trim() || extractedMetadata.year || null;
+  const finalOrderIndex = (order_index || '').toString().trim() || extractedMetadata.track || null;
+
+  const result = await db.run(
+    'INSERT INTO music (title, artist, album, year, description, filename, cover_image, order_index) VALUES (?,?,?,?,?,?,?,?)',
+    finalTitle, finalArtist, finalAlbum, finalYear, description, filename, cover, finalOrderIndex
+  );
+  const musicId = result.lastID;
+
+  let targetPlaylistId = (playlist_id || '').trim();
+  if (new_playlist_title && new_playlist_title.trim()) {
+    targetPlaylistId = await createMusicPlaylist(db, new_playlist_title, description || null);
+  }
+
+  if (musicId && targetPlaylistId) {
+    await assignTrackToPlaylist(db, targetPlaylistId, musicId, extractedMetadata.track || null);
+  }
+
   req.flash('success', 'Music uploaded');
   res.redirect('/admin/music');
 });
@@ -297,34 +448,29 @@ router.post('/music/batch', uploadBatchMusic, async (req, res) => {
 
   let targetPlaylistId = playlist_id;
   if (new_playlist_title && new_playlist_title.trim()) {
-    const result = await db.run('INSERT INTO music_playlists (title, description) VALUES (?, ?)', new_playlist_title.trim(), shared_description || null);
-    targetPlaylistId = result.lastID;
+    targetPlaylistId = await createMusicPlaylist(db, new_playlist_title, shared_description || null);
   }
 
   const uploadedTracks = [];
 
   for (const file of files) {
     const filePath = path.join('uploads/music', file.filename);
-    let metadata = {};
+    let metadata = {
+      title: '',
+      artist: '',
+      album: '',
+      year: '',
+      track: null,
+    };
     let coverFilename = sharedCoverFile ? sharedCoverFile.filename : null;
 
     try {
-      const parsed = await mm.parseFile(filePath);
-      metadata = {
-        title: parsed.common.title,
-        artist: parsed.common.artist,
-        album: parsed.common.album,
-        year: parsed.common.year,
-        track: parsed.common.track.no,
-        genre: parsed.common.genre ? parsed.common.genre[0] : null
-      };
-      // extract embedded cover if no shared cover
-      if (!coverFilename && parsed.common.picture && parsed.common.picture.length > 0) {
-        const pic = parsed.common.picture[0];
-        const ext = pic.format.split('/')[1] || 'jpg';
-        coverFilename = Date.now() + '_embedded.' + ext;
-        const fs = require('fs');
-        fs.writeFileSync(path.join('uploads/music', coverFilename), pic.data);
+      const parsed = await parseMusicUploadFromFile(filePath, file.originalname, {
+        extractCover: !coverFilename,
+      });
+      metadata = parsed.metadata;
+      if (!coverFilename && parsed.extractedCoverFilename) {
+        coverFilename = parsed.extractedCoverFilename;
       }
     } catch (err) {
       console.log('Metadata extraction failed for', file.originalname, err.message);
@@ -337,6 +483,10 @@ router.post('/music/batch', uploadBatchMusic, async (req, res) => {
     const year = metadata.year || default_year || null;
     const order_index = metadata.track || null;
 
+    if (coverFilename) {
+      await ensureArchiveVariant('music', coverFilename);
+    }
+
     const result = await db.run(
       'INSERT INTO music (title, artist, album, year, filename, cover_image, order_index) VALUES (?,?,?,?,?,?,?)',
       title, artist, album, year, file.filename, coverFilename, order_index
@@ -346,8 +496,7 @@ router.post('/music/batch', uploadBatchMusic, async (req, res) => {
 
     // assign to playlist if selected
     if (targetPlaylistId) {
-      const order = metadata.track || (await db.get('SELECT MAX(order_index) as max_order FROM music_playlist_items WHERE playlist_id = ?', targetPlaylistId)).max_order + 1 || 1;
-      await db.run('INSERT OR IGNORE INTO music_playlist_items (playlist_id, music_id, order_index) VALUES (?,?,?)', targetPlaylistId, musicId, order);
+      await assignTrackToPlaylist(db, targetPlaylistId, musicId, metadata.track || null);
     }
   }
 
@@ -382,6 +531,9 @@ router.put('/music/:id', uploadMusicFields, async (req, res) => {
   
   const filename = file || track.filename;
   const cover_image = cover || track.cover_image;
+  if (cover) {
+    await ensureArchiveVariant('music', cover_image);
+  }
   await db.run(
     'UPDATE music SET title=?, artist=?, album=?, year=?, description=?, filename=?, cover_image=?, order_index=? WHERE id=?',
     title, artist, album, year, description, filename, cover_image, order_index || null, req.params.id
@@ -584,6 +736,9 @@ router.post('/gallery', uploadImage.single('file'), async (req, res) => {
   const db = req.app.locals.db;
   const { title, caption, category, collections } = req.body;
   const filename = req.file ? req.file.filename : null;
+  if (filename) {
+    await ensureArchiveVariant('images', filename);
+  }
   const result = await db.run(
     'INSERT INTO gallery (title, caption, filename, category) VALUES (?,?,?,?)',
     title, caption, filename, category
@@ -623,6 +778,9 @@ router.put('/gallery/:id', uploadImage.single('file'), async (req, res) => {
   }
   
   const filename = file || img.filename;
+  if (file) {
+    await ensureArchiveVariant('images', filename);
+  }
   await db.run(
     'UPDATE gallery SET title=?, caption=?, category=?, filename=? WHERE id=?',
     title, caption, category, filename, req.params.id
@@ -721,6 +879,9 @@ router.post('/projects', uploadProjectWithDocs, async (req, res) => {
     
     const slug = await generateUniqueSlug(db, title);
     const hero = req.files && req.files.hero_image ? req.files.hero_image[0].filename : null;
+    if (hero) {
+      await ensureArchiveVariant('projects', hero);
+    }
     
     // Create project
     const result = await db.run(
@@ -801,6 +962,7 @@ router.put('/projects/:id', uploadProjectWithDocs, async (req, res) => {
       if (proj.hero_image && newHero !== proj.hero_image) {
         await deleteUploadedFile(proj.hero_image, 'projects');
       }
+      await ensureArchiveVariant('projects', newHero);
       hero = newHero;
     }
     
@@ -1239,6 +1401,22 @@ router.get('/playlists/videos', async (req, res) => {
   res.render('admin/playlists/videos', { playlists });
 });
 
+router.get('/playlists/videos/:id/edit', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const playlist = await db.get('SELECT * FROM video_playlists WHERE id = ?', req.params.id);
+    if (!playlist) {
+      req.flash('error', 'Playlist not found');
+      return res.redirect('/admin/playlists/videos');
+    }
+    return res.render('admin/playlists/video_edit', { playlist });
+  } catch (err) {
+    console.error('Video playlist edit error:', err);
+    req.flash('error', 'Failed to load playlist');
+    return res.redirect('/admin/playlists/videos');
+  }
+});
+
 router.post('/playlists/videos', async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -1263,15 +1441,20 @@ router.put('/playlists/videos/:id', async (req, res) => {
     const { title, description } = req.body;
     if (!title || title.trim() === '') {
       req.flash('error', 'Playlist title is required');
+      return res.redirect(`/admin/playlists/videos/${req.params.id}/edit`);
+    }
+    const playlist = await db.get('SELECT id FROM video_playlists WHERE id = ?', req.params.id);
+    if (!playlist) {
+      req.flash('error', 'Playlist not found');
       return res.redirect('/admin/playlists/videos');
     }
-    await db.run('UPDATE video_playlists SET title=?, description=? WHERE id=?', title, description, req.params.id);
+    await db.run('UPDATE video_playlists SET title=?, description=? WHERE id=?', title.trim(), description || null, req.params.id);
     req.flash('success', 'Playlist updated');
-    res.redirect('/admin/playlists/videos');
+    return res.redirect('/admin/playlists/videos');
   } catch (err) {
     console.error('Playlist update error:', err);
     req.flash('error', 'Failed to update playlist');
-    res.redirect('/admin/playlists/videos');
+    return res.redirect(`/admin/playlists/videos/${req.params.id}/edit`);
   }
 });
 
@@ -1429,6 +1612,22 @@ router.get('/collections/gallery', async (req, res) => {
   res.render('admin/collections/gallery', { collections });
 });
 
+router.get('/collections/gallery/:id/edit', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const collection = await db.get('SELECT * FROM gallery_collections WHERE id = ?', req.params.id);
+    if (!collection) {
+      req.flash('error', 'Collection not found');
+      return res.redirect('/admin/collections/gallery');
+    }
+    return res.render('admin/collections/gallery_edit', { collection });
+  } catch (err) {
+    console.error('Gallery collection edit load error:', err);
+    req.flash('error', 'Failed to load collection');
+    return res.redirect('/admin/collections/gallery');
+  }
+});
+
 router.post('/collections/gallery', async (req, res) => {
   try {
     const db = req.app.locals.db;
@@ -1444,6 +1643,29 @@ router.post('/collections/gallery', async (req, res) => {
     console.error('Collection creation error:', err);
     req.flash('error', 'Failed to create collection');
     res.redirect('/admin/collections/gallery');
+  }
+});
+
+router.put('/collections/gallery/:id', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const { title, description } = req.body;
+    if (!title || title.trim() === '') {
+      req.flash('error', 'Collection title is required');
+      return res.redirect(`/admin/collections/gallery/${req.params.id}/edit`);
+    }
+    const collection = await db.get('SELECT id FROM gallery_collections WHERE id = ?', req.params.id);
+    if (!collection) {
+      req.flash('error', 'Collection not found');
+      return res.redirect('/admin/collections/gallery');
+    }
+    await db.run('UPDATE gallery_collections SET title = ?, description = ? WHERE id = ?', title.trim(), description || null, req.params.id);
+    req.flash('success', 'Collection updated');
+    return res.redirect('/admin/collections/gallery');
+  } catch (err) {
+    console.error('Gallery collection update error:', err);
+    req.flash('error', 'Failed to update collection');
+    return res.redirect(`/admin/collections/gallery/${req.params.id}/edit`);
   }
 });
 

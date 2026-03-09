@@ -30,10 +30,10 @@
   <div class="gallery-main">
     <% if (images && images.length) { %>
       <div class="gallery-grid">
-        <% images.forEach(img => { %>
+        <% images.forEach((img, index) => { %>
           <div class="gallery-item">
-            <a href="/uploads/images/<%= img.filename %>?t=<%= Date.now() %>">
-              <img src="/uploads/images/<%= img.filename %>?t=<%= Date.now() %>" alt="<%= img.title %>">
+            <a href="/uploads/images/<%= img.filename %>">
+              <img src="<%= getArchiveImageUrl('images', img.filename) %>" alt="<%= img.title %>" loading="<%= index < 6 ? 'eager' : 'lazy' %>" decoding="async" width="480" height="480">
             </a>
             <h3><%= img.title %></h3>
             <p><%= img.caption %></p>

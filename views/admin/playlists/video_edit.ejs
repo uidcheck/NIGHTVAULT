@@ -1,0 +1,13 @@
+<%- include('../../partials/header') %>
+<%- include('../../partials/messages') %>
+<a href="/admin/playlists/videos" class="back-link">&larr; Back to video playlists</a>
+<h2>Edit Video Playlist</h2>
+
+<form action="/admin/playlists/videos/<%= playlist.id %>?_method=PUT" method="post" class="admin-form">
+  <label>Title: <input type="text" name="title" value="<%= playlist.title %>" required></label>
+  <label>Description: <textarea name="description"><%= playlist.description || '' %></textarea></label>
+  <button type="submit">Update Playlist</button>
+</form>
+
+<p style="margin-top: 1rem;"><a href="/admin/playlists/videos">&larr; Back to Video Playlists</a></p>
+<%- include('../../partials/footer') %>

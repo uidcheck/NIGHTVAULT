@@ -44,11 +44,11 @@
 
   <div class="music-grid">
     <% if (tracks && tracks.length) { %>
-      <% tracks.forEach(track => { %>
-        <div class="music-card" data-filename="<%= track.filename %>">
+      <% tracks.forEach((track, index) => { %>
+        <div class="music-card" data-filename="<%= track.filename %>" data-title="<%= track.title %>" data-artist="<%= track.artist || '' %>" data-music-id="<%= track.id %>">
           <div class="cover-container">
             <% if (track.cover_image) { %>
-              <img src="/uploads/music/<%= track.cover_image %>?t=<%= Date.now() %>" alt="cover" class="cover">
+              <img src="<%= getArchiveImageUrl('music', track.cover_image) %>" alt="<%= track.title %> cover" class="cover" loading="<%= index < 4 ? 'eager' : 'lazy' %>" decoding="async" width="300" height="300">
             <% } else { %>
               <div class="default-cover">
                 <i class="fas fa-music"></i>

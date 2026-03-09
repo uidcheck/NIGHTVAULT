@@ -111,8 +111,6 @@ footer {
 /* music grid */
 .music-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
 }
 .music-card {
   background: rgba(17, 17, 17, 0.95);
@@ -345,6 +343,7 @@ footer {
 .page-with-sidebar {
   display: flex;
   gap: 1rem;
+  align-items: flex-start;
 }
 
 /* admin membership manage panel */
@@ -371,6 +370,7 @@ footer {
 }
 /* ensure the main content area grows, preventing the sidebar from forcing a narrow single column grid */
 .page-with-sidebar .music-grid,
+.page-with-sidebar .video-grid,
 .page-with-sidebar .gallery-grid {
   flex: 1;
   min-width: 0; /* prevent flex overflow and allow grid to wrap correctly */
@@ -382,6 +382,46 @@ footer {
 }
 .page-with-sidebar .gallery-main {
   flex: 1;
+}
+
+/* shared archive grid sizing */
+.music-grid,
+.video-grid,
+.gallery-grid,
+.project-list {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 1rem;
+}
+
+.music-grid,
+.video-grid,
+.gallery-grid,
+.project-list {
+  align-content: start;
+}
+
+.music-grid > .music-card:only-child {
+  width: 100%;
+  max-width: 240px;
+  justify-self: start;
+}
+
+.video-grid > .video-card:only-child {
+  width: 100%;
+  max-width: 360px;
+  justify-self: start;
+}
+
+.gallery-grid > .gallery-item:only-child {
+  width: 100%;
+  max-width: 240px;
+  justify-self: start;
+}
+
+.project-list > .project-card:only-child {
+  width: 100%;
+  max-width: 360px;
+  justify-self: start;
 }
 
 .playlist-panel {
@@ -462,8 +502,6 @@ footer {
 /* video grid - YouTube style */
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
   position: relative;
   padding-bottom: 100px;
 }
@@ -589,8 +627,6 @@ footer {
 /* gallery */
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
-  gap: 1rem;
 }
 .gallery-item {
   background: rgba(17, 17, 17, 0.95);
@@ -667,8 +703,6 @@ footer {
 /* projects listing */
 .project-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
   position: relative;
   padding-bottom: 100px;
 }
