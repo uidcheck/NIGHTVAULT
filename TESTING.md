@@ -1,13 +1,13 @@
-# PARACAUSAL Testing Guide
+# NIGHTVAULT Testing Guide
 
-This document provides manual test cases for the PARACAUSAL website, covering automatic initialization, login, uploads, public rendering, project CRUD, playlists/collections, file cleanup, and access protection.
+This document provides manual test cases for the NIGHTVAULT website, covering automatic initialization, login, uploads, public rendering, project CRUD, playlists/collections, file cleanup, and access protection.
 
 ## Prerequisites
 
 1. Ensure Node.js and npm are installed.
 2. Change into the project directory:
 
-       cd /d "C:\path\to\paracausal"
+       cd /d "C:\path\to\nightvault"
 
 3. Install dependencies:
 
@@ -43,8 +43,8 @@ Change them immediately after first login before any real deployment.
 
 **Steps:**
 1. Delete the database file (if one exists from previous testing):
-   - Windows: Delete `database\paracausal.db`
-   - Linux/macOS: Delete `database/paracausal.db`
+       - Windows: Delete `database\nightvault.db`
+       - Linux/macOS: Delete `database/nightvault.db`
 2. From the project directory, run:
 
        npm start
@@ -90,7 +90,7 @@ Change them immediately after first login before any real deployment.
 1. After the server is running, log in as admin (admin/password)
 2. Verify you're logged in (dashboard shows)
 3. Open browser developer tools → Application → Cookies
-4. Find and note the `connect.sid` cookie value (session ID)
+4. Find and note the `nightvault.sid` cookie value (session ID)
 5. Stop the server (Ctrl+C)
 6. Wait 2 seconds
 7. Restart the server:
@@ -102,7 +102,7 @@ Change them immediately after first login before any real deployment.
 
 **Expected Result:**
 - After restart, you remain logged in
-- The `connect.sid` cookie is still valid
+- The `nightvault.sid` cookie is still valid
 - You can access `/admin` without being redirected to login
 - Session was recovered from the database
 - Console shows cleanup messages for expired sessions (if any)
@@ -350,7 +350,7 @@ Change them immediately after first login before any real deployment.
 **Objective:** Verify the home page renders correctly.
 
 **Expected Result:**
-- Site title `PARACAUSAL`
+- Site title `NIGHTVAULT`
 - Subtitle `Built on Feeling, Not Formula`
 - Navigation visible
 - Main archive cards visible

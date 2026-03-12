@@ -1,7 +1,7 @@
 {
-  "name": "paracausal",
+  "name": "nightvault",
   "version": "1.0.0",
-  "description": "Personal creative archive for music, videos, gallery work, and projects.",
+  "description": "Personal creative archive for music, videos, gallery work and projects.",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

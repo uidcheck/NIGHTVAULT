@@ -14,13 +14,26 @@ let trackChangeSequence = 0;
 let activeTrackChange = null;
 let lastHandledFinish = null;
 let saveTimer = null;
-const PLAYER_STATE_KEY = 'paracausalPlayerState.v2';
+const PLAYER_STATE_KEY = 'nightvaultPlayerState.v2';
+const LEGACY_PLAYER_STATE_KEY = 'paracausalPlayerState.v2';
 const TRACK_URL_BASE = '/uploads/music/';
 const REPEAT_MODE_SEQUENCE = ['off', 'one', 'all'];
 let shuffleEnabled = false;
 let repeatMode = 'off';
 let playbackOrder = [];
 let playbackOrderPosition = -1;
+
+function migrateLegacyPlayerState() {
+  if (typeof localStorage === 'undefined') return;
+  if (localStorage.getItem(PLAYER_STATE_KEY) !== null) return;
+
+  const legacyState = localStorage.getItem(LEGACY_PLAYER_STATE_KEY);
+  if (legacyState === null) return;
+
+  localStorage.setItem(PLAYER_STATE_KEY, legacyState);
+}
+
+migrateLegacyPlayerState();
 
 function formatTime(seconds) {
   const safe = Number.isFinite(seconds) ? seconds : 0;

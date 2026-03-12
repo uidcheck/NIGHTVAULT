@@ -1,5 +1,5 @@
 /**
- * PARACAUSAL Orphaned Files Cleanup Utility
+ * NIGHTVAULT Orphaned Files Cleanup Utility
  * 
  * This script scans the uploads directory and removes files that are no longer
  * referenced in the database. Run this after deletions to clean up orphaned files.
@@ -55,7 +55,7 @@ async function assertExpectedTablesExist(db, dbFilePath) {
 
 async function main() {
   console.log(`${colors.cyan}==============================================`);
-  console.log(`PARACAUSAL Orphaned Files Cleanup Utility`);
+  console.log(`NIGHTVAULT Orphaned Files Cleanup Utility`);
   console.log(`==============================================`);
   console.log(`Mode: ${dryRun ? colors.yellow + 'DRY RUN (no files will be deleted)' : colors.red + 'LIVE (files will be deleted)'}${colors.reset}\n`);
   console.log(`${colors.cyan}Database path: ${DB_FILE_PATH}${colors.reset}\n`);

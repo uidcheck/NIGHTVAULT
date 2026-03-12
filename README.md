@@ -1,33 +1,63 @@
-# PARACAUSAL
+# NIGHTVAULT
 
-PARACAUSAL is a personal creative archive for music, videos, gallery work, and projects, built with Node.js, Express, EJS, SQLite, and a dark retro visual style.
+**NIGHTVAULT** is a self-hosted creative archive and media management platform for music, videos, gallery work and projects, built with Node.js, Express, EJS, SQLite and a dark retro-inspired interface.
+
+It is designed for individuals, artists, collectors and small creators who want a private or public-facing space to organise and publish their work without relying on third-party platforms.
 
 ## Features
 
-- Public pages for Home, Music, Videos, Gallery, and Projects
-- Admin login with session-based authentication
+- Public pages for Home, Music, Videos, Gallery and Projects
+- Admin login with session-based authentication, CSRF protection and strict same-site session cookies
 - Upload and manage:
   - music tracks and cover art
   - videos and thumbnails
   - gallery images
-  - projects, project hero images, documents, and updates
+  - projects, hero images, documents and updates
 - WAV music uploads are automatically converted to MP3 for faster web playback
 - Playlists for music and videos
 - Collections for gallery items and projects
-- Global and section-based search/filtering
-- SQLite database with seed/setup support
+- Global and section-based search and filtering
+- SQLite database with automatic setup and seed support
 - Persistent music player with waveform visualisation
 - Project updates with file attachments
 - Automatic cleanup of uploaded files when content is deleted
 - Orphaned upload cleanup utility
 - Responsive dark archive-style interface
 
+## Screenshots
+
+NIGHTVAULT combines a dark retro-inspired interface with a self-hosted media and project archive workflow.
+
+### Home
+
+![NIGHTVAULT home page](./screenshots/home.png)
+
+### Music Library
+
+![NIGHTVAULT music page](./screenshots/music.png)
+
+### Video Archive
+
+![NIGHTVAULT videos page](./screenshots/videos.png)
+
+### Gallery Collections
+
+![NIGHTVAULT gallery page](./screenshots/gallery.png)
+
+### Projects and Updates
+
+![NIGHTVAULT projects page](./screenshots/projects.png)
+
+### Admin Dashboard
+
+![NIGHTVAULT admin dashboard](./screenshots/admin-dashboard.png)
+
 ## Tech Stack
 
 - Node.js
 - Express
 - EJS
-- SQLite (for both app data and session storage)
+- SQLite for both app data and session storage
 - multer
 - bcrypt
 - express-session with persistent SQLite session store
@@ -52,35 +82,39 @@ Start the application:
 npm start
 ```
 
-The app will automatically:
-- Create the SQLite database file if it doesn't exist
-- Initialize all required tables and indexes
-- Create a default admin account on first startup
+On first startup, the app will automatically:
 
-Open the site in your browser at:
+- create the SQLite database file if it does not exist
+- initialise all required tables and indexes
+- create a default admin account if no admin account exists yet
+
+Open the site in your browser:
 
 ```text
 http://localhost:3000
 ```
 
 Log in with the default credentials:
-- Username: `admin`
-- Password: `password`
 
-**Important:** Change the default admin password immediately after first login. See [Changing the Admin Password](#changing-the-admin-password) below.
+```text
+Username: admin
+Password: password
+```
+
+**Important:** Change the default admin password immediately after first login. See [Changing the Admin Password](#changing-the-admin-password).
 
 ## Docker Setup
 
 This project can also be run with Docker Compose.
 
-### Clone the repository
+Clone the repository:
 
 ```bash
-git clone https://github.com/uidcheck/paracausal.git
-cd paracausal
+git clone https://github.com/uidcheck/nightvault.git
+cd nightvault
 ```
 
-### Copy the environment file
+Copy the environment file.
 
 Linux/macOS:
 
@@ -90,13 +124,19 @@ cp .env.example .env
 
 Windows CMD:
 
-```bat
+```cmd
 copy .env.example .env
 ```
 
 Then edit `.env` and set a strong `SESSION_SECRET`.
 
-For Docker, database storage is configured via `DB_PATH=/app/data/paracausal.db` in `docker-compose.yml`.
+For Docker, database storage is configured via:
+
+```text
+DB_PATH=/app/data/nightvault.db
+```
+
+in `docker-compose.yml`.
 
 ### Create persistent data folders
 
@@ -110,7 +150,7 @@ mkdir -p data uploads/music uploads/videos uploads/images uploads/projects uploa
 
 Windows CMD:
 
-```bat
+```cmd
 mkdir data
 mkdir uploads
 mkdir uploads\music
@@ -154,20 +194,24 @@ Example:
 PORT=3000
 SESSION_SECRET=replace-this-with-a-long-random-secret
 TRUST_PROXY=1
-# Optional: override SQLite file path (default: database/paracausal.db)
-# DB_PATH=database/paracausal.db
+# Optional: override SQLite file path (default: database/nightvault.db)
+# DB_PATH=database/nightvault.db
+# Optional: override the session cookie name (default: nightvault.sid)
+# SESSION_COOKIE_NAME=nightvault.sid
 ```
 
 ## Default Admin Account
 
 On first startup, the app automatically creates a default admin account:
 
-- Username: `admin`
-- Password: `password`
+```text
+Username: admin
+Password: password
+```
 
-This account is created only if no other admin account exists. If you delete the database file and restart, a new default admin will be created.
+This account is only created if no other admin account exists. If you delete the database file and restart, a new default admin account will be created.
 
-**IMPORTANT:** The default password is public and known. You must change it before any production use. See [Changing the Admin Password](#changing-the-admin-password) below.
+**Important:** The default password is public and known. Change it before any production use.
 
 ## Changing the Admin Password
 
@@ -193,28 +237,30 @@ After a successful password change, the new password takes effect immediately.
 
 If you forget the admin password, you can reset it directly inside the Docker container without losing any site content.
 
-This only updates the admin password in the database. It does **not** delete music, videos, gallery items, projects, uploads, playlists, collections, or any other data.
+This only updates the admin password in the database. It does not delete music, videos, gallery items, projects, uploads, playlists, collections or any other stored data.
 
 ### Open a shell inside the running container
 
 ```bash
-docker compose exec paracausal sh
+docker compose exec nightvault sh
 ```
 
 ### Run the password reset command
 
-Replace `NewPassword123` with the password you want to set.
+Replace `NewPassword123` with the password you want to set:
 
-```sh
-node -e "const bcrypt=require('bcrypt'); const sqlite3=require('sqlite3').verbose(); bcrypt.hash('NewPassword123',10).then(hash=>{ const db=new sqlite3.Database('/app/data/paracausal.db'); db.run(\"UPDATE admins SET password = ? WHERE username = 'admin'\", [hash], function(err){ if(err){ console.error(err); process.exit(1);} console.log('Admin password reset successfully'); db.close(); }); });"
+```bash
+node -e "const bcrypt=require('bcrypt'); const sqlite3=require('sqlite3').verbose(); bcrypt.hash('NewPassword123',10).then(hash=>{ const db=new sqlite3.Database('/app/data/nightvault.db'); db.run(\"UPDATE admins SET password = ? WHERE username = 'admin'\", [hash], function(err){ if(err){ console.error(err); process.exit(1);} console.log('Admin password reset successfully'); db.close(); }); });"
 ```
 
 ### Log in again
 
 Use:
 
-- Username: `admin`
-- Password: the new password you just set
+```text
+Username: admin
+Password: the new password you just set
+```
 
 ### Notes
 
@@ -226,13 +272,13 @@ Use:
 
 - Go to `/login`
 - Sign in with the admin account
-- Use the dashboard to manage music, videos, gallery items, projects, playlists, and collections
+- Use the dashboard to manage music, videos, gallery items, projects, playlists and collections
 
 ## Upload Storage
 
 Uploaded files are stored under `uploads/`:
 
-- `uploads/music/` — music playback files and cover images. WAV/WAVE uploads are converted to MP3 automatically and the converted MP3 is stored for playback.
+- `uploads/music/` — music playback files and cover images. WAV/WAVE uploads are converted to MP3 automatically and the converted MP3 is stored for playback
 - `uploads/videos/` — video files and thumbnails
 - `uploads/images/` — gallery images
 - `uploads/projects/` — project hero images
@@ -244,26 +290,40 @@ Make sure these folders are writable in your deployment environment.
 
 The app uses SQLite for both application data and session storage.
 
-**Database file (default local):** `database/paracausal.db`
+Default local database file:
 
-You can override the database file path with `DB_PATH`.
-Example Docker path: `/app/data/paracausal.db`
+```text
+database/nightvault.db
+```
 
-**Session storage:** Sessions are stored in the `sessions` table within the same SQLite database. This ensures:
-- Sessions persist across app restarts
-- Expired sessions are automatically cleaned up every 15 minutes
-- Production-safe session handling (no more MemoryStore warnings)
-- Sessions work correctly in Docker and containerized deployments
+You can override the database file path with `DB_PATH`. Example Docker path:
 
-## Session And CSRF Hardening
+```text
+/app/data/nightvault.db
+```
+
+## Upgrade Note
+
+Existing deployments that currently use `paracausal.db` should either rename or move that file to `nightvault.db` or set `DB_PATH` explicitly during the upgrade so the app continues using the existing data.
+
+### Session storage
+
+Sessions are stored in the `sessions` table within the same SQLite database. This ensures:
+
+- sessions persist across app restarts
+- expired sessions are automatically cleaned up every 15 minutes
+- production-safe session handling without `MemoryStore` warnings
+- sessions work correctly in Docker and other containerised deployments
+
+## Session and CSRF Hardening
 
 - `SESSION_SECRET` is required when `NODE_ENV=production`
 - In local development, if `SESSION_SECRET` is not set, the app uses a temporary fallback secret and logs a warning
-- Session cookies are `httpOnly`, `sameSite=lax`, and use automatic `secure` handling in production
+- Session cookies are configured as `nightvault.sid`, are `httpOnly` with `sameSite=strict` and use automatic secure handling in production
 - `TRUST_PROXY=1` is recommended when running behind HTTPS via a reverse proxy so secure cookies are detected correctly
 - State-changing auth and admin forms are protected by CSRF tokens
 
-If you deploy behind a reverse proxy such as Nginx, Caddy, or a platform load balancer, set:
+If you deploy behind a reverse proxy such as Nginx, Caddy or a load balancer, set:
 
 ```env
 NODE_ENV=production
@@ -278,19 +338,19 @@ Database files should not be committed to Git. Keep live database files outside 
 When running with Docker Compose:
 
 - SQLite database data is stored in `./data`
-- Docker sets `DB_PATH=/app/data/paracausal.db` and mounts `./data:/app/data`
+- Docker sets `DB_PATH=/app/data/nightvault.db` and mounts `./data:/app/data`
 - Uploaded files are stored in `./uploads`
 - Rebuilding the container does not remove your content as long as those folders are preserved
 - The default admin account is automatically created on first startup
 
-On your first access:
+On first access:
 
-1. Open http://localhost:3000
+1. Open `http://localhost:3000`
 2. Go to `/login`
 3. Log in with:
    - Username: `admin`
    - Password: `password`
-4. Change the password immediately in the admin panel (Account → Change Password)
+4. Change the password immediately in the admin panel under **Account → Change Password**
 
 ## Maintenance
 
@@ -310,10 +370,15 @@ Use the dry run first.
 
 ## Usage
 
-This is a personal project repository published for deployment and reference purposes. It is not intended as a general reusable package or public template.
+NIGHTVAULT is intended as a self-hosted creative archive and publishing platform. It can be used as-is for personal deployments, adapted for private media libraries or extended into a more customised portfolio or archival system.
 
-## Notes
+## Production Notes
 
 - Use a strong session secret in production
 - Use HTTPS and a reverse proxy in production
-- This project is intentionally designed with a dark, minimal, retro archive feel
+- Ensure upload and data directories are backed up
+- Change the default admin password immediately on first login
+
+## Design Goals
+
+This project is intentionally designed with a dark, minimal retro archive feel, combining self-hosted control with a curated presentation layer for media and project work.

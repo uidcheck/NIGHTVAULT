@@ -203,7 +203,7 @@ function getUserFacingErrorMessage(err, statusCode) {
     session({
       store: sessionStore,
       secret: sessionSecret || crypto.randomBytes(32).toString('hex'),
-      name: process.env.SESSION_COOKIE_NAME || 'paracausal.sid',
+      name: process.env.SESSION_COOKIE_NAME || 'nightvault.sid',
       proxy: !!trustProxySetting,
       resave: false,
       saveUninitialized: false,
