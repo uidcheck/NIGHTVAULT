@@ -9,7 +9,7 @@ function createCsrfToken() {
 function attachCsrfToken(req, res, next) {
   const requiresToken = !!(
     req.session && req.session.admin
-  ) || req.path === '/login' || req.path === '/logout' || req.path.startsWith('/admin');
+  ) || req.path === '/login' || req.path === '/logout' || req.path === '/setup' || req.path.startsWith('/admin');
 
   if (!req.session || !requiresToken) {
     res.locals.csrfToken = '';
@@ -61,7 +61,7 @@ function rejectInvalidCsrf(req, res) {
     req.flash('error', 'Your session expired or the form token was invalid. Please try again.');
   }
 
-  const fallbackPath = req.session && req.session.admin ? '/admin' : '/login';
+  const fallbackPath = req.session && req.session.admin ? '/admin' : (req.adminSetupRequired ? '/setup' : '/login');
   return res.status(403).redirect(req.get('referrer') || fallbackPath);
 }
 

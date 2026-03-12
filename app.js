@@ -6,7 +6,6 @@ const path = require('path');
 const methodOverride = require('method-override');
 const sqlite3 = require('sqlite3').verbose();
 const { open } = require('sqlite');
-const bcrypt = require('bcrypt');
 const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
@@ -19,6 +18,7 @@ const {
   validateCsrfTokenForNonMultipart,
 } = require('./middleware/security');
 const { ensureArchiveVariant, getArchiveImageUrl } = require('./utils/image-variants');
+const { bootstrapInitialAdminFromEnv, getAdminCount, hasAnyAdmin } = require('./utils/admin-setup');
 
 ffmpeg.setFfmpegPath(ffmpegStatic);
 ffmpeg.setFfprobePath(ffprobeStatic.path);
@@ -37,11 +37,11 @@ function requestExpectsJson(req) {
 }
 
 function isAdminRequest(req) {
-  return req.originalUrl === '/admin' || req.originalUrl.startsWith('/admin/');
+  return req.path === '/admin' || req.path.startsWith('/admin/');
 }
 
 function isAuthRequest(req) {
-  return req.originalUrl === '/login' || req.originalUrl === '/logout';
+  return req.path === '/login' || req.path === '/logout' || req.path === '/setup';
 }
 
 function getErrorStatusCode(err) {
@@ -127,21 +127,20 @@ function getUserFacingErrorMessage(err, statusCode) {
   await ensureArchiveVariants(await db.all('SELECT hero_image FROM projects WHERE hero_image IS NOT NULL'), 'projects', 'hero_image');
 
   // ============================================================================
-  // Ensure default admin account exists (idempotent)
+  // Bootstrap initial admin account if requested
   // ============================================================================
   try {
-    const adminCount = await db.get('SELECT COUNT(*) as cnt FROM admins');
-    if (adminCount.cnt === 0) {
-      // No admin exists, create the default admin account
-      const hash = await bcrypt.hash('password', 10);
-      await db.run('INSERT INTO admins (username, password) VALUES (?, ?)', 'admin', hash);
-      console.log('✓ Default admin account created (username: admin, password: password)');
-      console.log('⚠️  WARNING: Default password is public. Change it immediately in the admin panel.');
+    const adminCount = await getAdminCount(db);
+    if (adminCount === 0) {
+      const bootstrapResult = await bootstrapInitialAdminFromEnv(db, process.env, console);
+      if (!bootstrapResult.created) {
+        console.log('⚠️  No admin account exists yet. Complete the one-time setup at /setup.');
+      }
     } else {
-      console.log(`✓ Admin account check passed (${adminCount.cnt} admin(s) exist)`);
+      console.log(`✓ Admin account check passed (${adminCount} admin(s) exist)`);
     }
   } catch (err) {
-    console.error('Failed to ensure default admin account:', err);
+    console.error('Failed to initialize admin setup state:', err);
     // This is not a fatal error - continue startup
   }
 
@@ -244,15 +243,58 @@ function getUserFacingErrorMessage(err, statusCode) {
 
   app.use(attachCsrfToken);
 
+  app.use((req, res, next) => {
+    hasAnyAdmin(db)
+      .then((adminExists) => {
+        req.adminExists = adminExists;
+        req.adminSetupRequired = !adminExists;
+        res.locals.adminSetupRequired = !adminExists;
+        next();
+      })
+      .catch(next);
+  });
+
   // set locals middleware
   app.use((req, res, next) => {
     res.locals.currentUser = req.session.admin || null;
+    res.locals.adminSetupRequired = !!req.adminSetupRequired;
+    res.locals.hidePlayer = false;
     res.locals.success = req.flash('success');
     res.locals.error = req.flash('error');
     next();
   });
 
   app.use(validateCsrfTokenForNonMultipart);
+
+  app.use((req, res, next) => {
+    if (!req.adminSetupRequired) {
+      return next();
+    }
+
+    if (req.path === '/setup') {
+      return next();
+    }
+
+    if (req.path === '/logout') {
+      if (req.session) {
+        return req.session.destroy((err) => {
+          if (err) {
+            return next(err);
+          }
+
+          return res.redirect('/setup');
+        });
+      }
+
+      return res.redirect('/setup');
+    }
+
+    if (typeof req.flash === 'function') {
+      req.flash('error', 'Complete the one-time setup to create the first admin account.');
+    }
+
+    return res.redirect('/setup');
+  });
 
   // routes
   app.use('/', publicRoutes);
@@ -284,7 +326,9 @@ function getUserFacingErrorMessage(err, statusCode) {
         req.flash('error', userMessage);
       }
 
-      const fallbackPath = authRequest ? '/login' : '/admin';
+      const fallbackPath = authRequest
+        ? (req.adminSetupRequired ? '/setup' : '/login')
+        : '/admin';
       return res.status(statusCode).redirect(req.get('referrer') || fallbackPath);
     }
 

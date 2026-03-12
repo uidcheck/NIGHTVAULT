@@ -194,7 +194,7 @@ On first startup, the app will automatically:
 
 - create the SQLite database file if it does not exist
 - initialise all required tables and indexes
-- create a default admin account if no admin account exists yet
+- expose a one-time setup page at `/setup` when no admin account exists
 
 Open the site in your browser:
 
@@ -202,14 +202,13 @@ Open the site in your browser:
 http://localhost:3000
 ```
 
-Log in with the default credentials:
+On a fresh install with no admin account, open `/setup` and create the initial admin username and password.
 
-```text
-Username: admin
-Password: password
-```
+If `INITIAL_ADMIN_USERNAME` and `INITIAL_ADMIN_PASSWORD` are both set when the app starts, NIGHTVAULT creates that first admin automatically and skips the web setup flow.
 
-**Important:** Change the default admin password immediately after first login. See [Changing the Admin Password](#changing-the-admin-password).
+After setup is complete, sign in at `/login`.
+
+Existing installs that already have an admin account keep the current login flow and do not show `/setup`.
 
 ## Environment Variables
 
@@ -221,24 +220,23 @@ Example:
 PORT=3000
 SESSION_SECRET=replace-this-with-a-long-random-secret
 TRUST_PROXY=1
+# Optional: bootstrap the first admin account on startup when no admin exists
+# INITIAL_ADMIN_USERNAME=yourname
+# INITIAL_ADMIN_PASSWORD=replace-this-with-a-strong-password
 # Optional: override SQLite file path (default: database/nightvault.db)
 # DB_PATH=database/nightvault.db
 # Optional: override the session cookie name (default: nightvault.sid)
 # SESSION_COOKIE_NAME=nightvault.sid
 ```
 
-## Default Admin Account
+Bootstrap behavior:
 
-On first startup, the app automatically creates a default admin account:
+- if both `INITIAL_ADMIN_USERNAME` and `INITIAL_ADMIN_PASSWORD` are set and no admin exists, the app creates that first admin on startup
+- if only one of those variables is set, the app logs a warning and falls back to the web setup flow
+- if neither variable is set, the app falls back to the web setup flow
+- if an admin already exists, the env vars are ignored
 
-```text
-Username: admin
-Password: password
-```
-
-This account is only created if no other admin account exists. If you delete the database file and restart, a new default admin account will be created.
-
-**Important:** The default password is public and known. Change it before any production use.
+The app no longer creates `admin / password` automatically on a brand-new install.
 
 ## Changing the Admin Password
 
@@ -260,6 +258,28 @@ Password rules:
 
 After a successful password change, the new password takes effect immediately.
 
+## Changing the Admin Username
+
+After logging in as admin:
+
+1. Open the admin dashboard
+2. Go to the **Account** section
+3. Click **Change Username**
+4. Enter:
+  - your current password
+  - your new username
+  - confirmation of the new username
+
+Username rules:
+
+- new username is trimmed before saving
+- minimum length: 3 characters
+- maximum length: 50 characters
+- new username and confirmation must match
+- new username must be different from the current username
+
+After a successful username change, the current session stays valid and future logins must use the new username.
+
 ## Recovering Admin Access
 
 If you forget the admin password, you can reset it directly inside the Docker container without losing any site content.
@@ -277,7 +297,7 @@ docker compose exec nightvault sh
 Replace `NewPassword123` with the password you want to set:
 
 ```bash
-node -e "const bcrypt=require('bcrypt'); const sqlite3=require('sqlite3').verbose(); bcrypt.hash('NewPassword123',10).then(hash=>{ const db=new sqlite3.Database('/app/data/nightvault.db'); db.run(\"UPDATE admins SET password = ? WHERE username = 'admin'\", [hash], function(err){ if(err){ console.error(err); process.exit(1);} console.log('Admin password reset successfully'); db.close(); }); });"
+node -e "const bcrypt=require('bcrypt'); const sqlite3=require('sqlite3').verbose(); bcrypt.hash('NewPassword123',10).then(hash=>{ const db=new sqlite3.Database('/app/data/nightvault.db'); db.get('SELECT id, username FROM admins ORDER BY id LIMIT 1', (readErr, admin)=>{ if(readErr || !admin){ console.error(readErr || new Error('No admin account found')); process.exit(1);} db.run('UPDATE admins SET password = ? WHERE id = ?', [hash, admin.id], function(err){ if(err){ console.error(err); process.exit(1);} console.log('Admin password reset successfully for username: ' + admin.username); db.close(); }); }); });"
 ```
 
 ### Log in again
@@ -285,7 +305,7 @@ node -e "const bcrypt=require('bcrypt'); const sqlite3=require('sqlite3').verbos
 Use:
 
 ```text
-Username: admin
+Username: the admin username you created during setup
 Password: the new password you just set
 ```
 
@@ -297,8 +317,10 @@ Password: the new password you just set
 
 ## Admin Usage
 
+- On a fresh install, complete `/setup` first unless you used `INITIAL_ADMIN_*`
 - Go to `/login`
 - Sign in with the admin account
+- Use the **Account** section to change the admin username or password
 - Use the dashboard to manage music, videos, gallery items, projects, playlists and collections
 
 ## Upload Storage
@@ -368,16 +390,14 @@ When running with Docker Compose:
 - Docker sets `DB_PATH=/app/data/nightvault.db` and mounts `./data:/app/data`
 - Uploaded files are stored in `./uploads`
 - Recreating the container does not remove your content as long as those folders are preserved
-- The default admin account is automatically created on first startup
+- You can set `INITIAL_ADMIN_USERNAME` and `INITIAL_ADMIN_PASSWORD` in `.env` to bootstrap the first admin account automatically
 
 On first access:
 
 1. Open `http://localhost:3000`
-2. Go to `/login`
-3. Log in with:
-   - Username: `admin`
-   - Password: `password`
-4. Change the password immediately in the admin panel under **Account → Change Password**
+2. If you did not set `INITIAL_ADMIN_*`, go to `/setup` and create the initial admin account
+3. Go to `/login` if you are not signed in already
+4. Use the admin panel under **Account → Change Password** whenever you need to rotate the password
 
 ## Maintenance
 
@@ -404,7 +424,7 @@ NIGHTVAULT is intended as a self-hosted creative archive and publishing platform
 - Use a strong session secret in production
 - Use HTTPS and a reverse proxy in production
 - Ensure upload and data directories are backed up
-- Change the default admin password immediately on first login
+- Set `INITIAL_ADMIN_*` for automated deployments or complete `/setup` before exposing the app
 
 ## Design Goals
 

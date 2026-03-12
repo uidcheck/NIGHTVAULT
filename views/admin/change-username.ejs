@@ -1,0 +1,12 @@
+<%- include('../partials/header') %>
+<%- include('../partials/messages') %>
+<a href="/admin" class="back-link">&larr; Back to dashboard</a>
+<h2>Change Admin Username</h2>
+<form action="/admin/change-username" method="post" class="admin-form" data-no-soft-submit="true">
+  <%- include('../partials/csrf-field') %>
+  <label>Current Password: <input type="password" name="currentPassword" required></label>
+  <label>New Username: <input type="text" name="newUsername" required minlength="3" maxlength="50"></label>
+  <label>Confirm New Username: <input type="text" name="confirmUsername" required minlength="3" maxlength="50"></label>
+  <button type="submit">Change Username</button>
+</form>
+<%- include('../partials/footer') %>

@@ -1,0 +1,27 @@
+<%- include('../partials/header') %>
+<%- include('../partials/messages') %>
+<section class="setup-shell">
+  <div class="setup-panel">
+    <p class="setup-eyebrow">ONE-TIME INITIAL SETUP</p>
+    <h2>Initialize NIGHTVAULT Admin Access</h2>
+    <p class="setup-copy">Create the first administrator account for NIGHTVAULT. This setup screen disappears once an admin account exists.</p>
+    <form action="/setup" method="post" class="admin-form" data-no-soft-submit="true" autocomplete="off">
+      <%- include('../partials/csrf-field') %>
+      <label>
+        Admin Username
+        <input type="text" name="username" value="<%= formData && formData.username ? formData.username : '' %>" required autocomplete="username">
+      </label>
+      <label>
+        Admin Password
+        <input type="password" name="password" required minlength="8" autocomplete="new-password">
+      </label>
+      <label>
+        Confirm Password
+        <input type="password" name="confirmPassword" required minlength="8" autocomplete="new-password">
+      </label>
+      <button type="submit">Create Initial Admin</button>
+    </form>
+    <p class="setup-hint">One-time setup. Minimum password length: 8 characters.</p>
+  </div>
+</section>
+<%- include('../partials/footer') %>

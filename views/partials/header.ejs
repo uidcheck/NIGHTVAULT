@@ -33,6 +33,8 @@
               <button type="submit" class="link-button">Logout</button>
             </form>
           </li>
+        <% } else if (adminSetupRequired) { %>
+          <li><a href="/setup">Setup</a></li>
         <% } else { %>
           <li><a href="/login">Admin</a></li>
         <% } %>

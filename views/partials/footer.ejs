@@ -2,6 +2,7 @@
   <footer>
     <p>&copy; <%= new Date().getFullYear() %> NIGHTVAULT</p>
   </footer>
+  <% if (!(typeof hidePlayer !== 'undefined' && hidePlayer)) { %>
   <div id="audio-player" class="audio-player">
     <div class="controls">
       <div class="left-group">
@@ -27,6 +28,7 @@
       </div>
     </div>
   </div>
+  <% } %>
   <script>
     (() => {
       function getCsrfToken() {

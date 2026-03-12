@@ -26,6 +26,8 @@ const HOMEPAGE_LINK_SECTIONS = {
   socials: 'Socials',
   other: 'Other Links',
 };
+const ADMIN_USERNAME_MIN_LENGTH = 3;
+const ADMIN_USERNAME_MAX_LENGTH = 50;
 
 // ============================================================================
 // FILE DELETION HELPERS
@@ -2418,6 +2420,86 @@ router.delete('/collections/projects/:id', async (req, res) => {
 router.post('/logout', (req, res) => {
   req.session.destroy();
   res.redirect('/');
+});
+
+// ============================================================================
+// USERNAME CHANGE
+// ============================================================================
+
+// GET change username page
+router.get('/change-username', (req, res) => {
+  res.render('admin/change-username');
+});
+
+// POST change username
+router.post('/change-username', async (req, res) => {
+  try {
+    const db = req.app.locals.db;
+    const { currentPassword, newUsername, confirmUsername } = req.body;
+
+    if (!req.session || !req.session.admin) {
+      req.flash('error', 'Session expired. Please log in again.');
+      return res.redirect('/login');
+    }
+
+    const adminId = req.session.admin.id;
+    const admin = await db.get('SELECT * FROM admins WHERE id = ?', adminId);
+
+    if (!admin) {
+      req.flash('error', 'Admin account not found.');
+      return res.redirect('/admin');
+    }
+
+    const currentPasswordValid = await bcrypt.compare(currentPassword, admin.password);
+    if (!currentPasswordValid) {
+      req.flash('error', 'Current password is incorrect.');
+      return res.redirect('/admin/change-username');
+    }
+
+    const trimmedUsername = typeof newUsername === 'string' ? newUsername.trim() : '';
+    const trimmedConfirmation = typeof confirmUsername === 'string' ? confirmUsername.trim() : '';
+
+    if (!trimmedUsername) {
+      req.flash('error', 'New username is required.');
+      return res.redirect('/admin/change-username');
+    }
+
+    if (trimmedUsername.length < ADMIN_USERNAME_MIN_LENGTH || trimmedUsername.length > ADMIN_USERNAME_MAX_LENGTH) {
+      req.flash('error', `New username must be between ${ADMIN_USERNAME_MIN_LENGTH} and ${ADMIN_USERNAME_MAX_LENGTH} characters long.`);
+      return res.redirect('/admin/change-username');
+    }
+
+    if (trimmedUsername !== trimmedConfirmation) {
+      req.flash('error', 'New username and confirmation do not match.');
+      return res.redirect('/admin/change-username');
+    }
+
+    if (trimmedUsername === admin.username) {
+      req.flash('error', 'New username must be different from the current username.');
+      return res.redirect('/admin/change-username');
+    }
+
+    const existingAdmin = await db.get('SELECT id FROM admins WHERE username = ? AND id != ?', trimmedUsername, adminId);
+    if (existingAdmin) {
+      req.flash('error', 'That username is already in use.');
+      return res.redirect('/admin/change-username');
+    }
+
+    await db.run('UPDATE admins SET username = ? WHERE id = ?', trimmedUsername, adminId);
+    req.session.admin.username = trimmedUsername;
+
+    req.flash('success', 'Username changed successfully.');
+    return res.redirect('/admin');
+  } catch (err) {
+    if (err && err.code === 'SQLITE_CONSTRAINT') {
+      req.flash('error', 'That username is already in use.');
+      return res.redirect('/admin/change-username');
+    }
+
+    console.error('Username change error:', err);
+    req.flash('error', 'Failed to change username. Please try again.');
+    return res.redirect('/admin/change-username');
+  }
 });
 
 // ============================================================================
