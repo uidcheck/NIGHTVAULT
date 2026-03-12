@@ -7,3 +7,5 @@ data
 uploads
 database/*.db
 database/*.sqlite
+TESTING.md
+/tmp/

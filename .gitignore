@@ -5,3 +5,5 @@ data/
 database/*.db
 database/*.sqlite
 npm-debug.log
+TESTING.md
+/tmp/
