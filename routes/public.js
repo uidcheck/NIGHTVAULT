@@ -87,10 +87,13 @@ router.get('/videos', async (req, res) => {
     );
   }
 
-  let sql = `SELECT * FROM videos
-             WHERE filename IS NOT NULL
-               AND TRIM(filename) != ''`;
+  let sql = 'SELECT * FROM videos';
   const params = [];
+  const whereClauses = [
+    'filename IS NOT NULL',
+    "TRIM(filename) != ''",
+  ];
+
   if (req.query.playlist) {
     sql = `SELECT v.* FROM videos v
            JOIN video_playlist_items vpi ON vpi.video_id = v.id
@@ -109,15 +112,16 @@ router.get('/videos', async (req, res) => {
     }
   } else {
     if (req.query.search) {
-      sql += ' WHERE title LIKE ? OR description LIKE ?';
+      whereClauses.push('(title LIKE ? OR description LIKE ?)');
       const term = `%${req.query.search}%`;
       params.push(term, term);
     }
     if (req.query.category) {
-      sql += params.length ? ' AND ' : ' WHERE ';
-      sql += ' category LIKE ?';
+      whereClauses.push('category LIKE ?');
       params.push(`%${req.query.category}%`);
     }
+
+    sql += ' WHERE ' + whereClauses.join(' AND ');
   }
   sql += ' ORDER BY created_at DESC';
   const videos = await db.all(sql, ...params);
