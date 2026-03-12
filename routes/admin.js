@@ -1,5 +1,4 @@
-const express = require('express');
-const router = express.Router();
+const { createAsyncRouter } = require('../middleware/async-router');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 const path = require('path');
@@ -9,6 +8,8 @@ const ffmpegStatic = require('ffmpeg-static');
 const mm = require('music-metadata');
 const { validateCsrfToken } = require('../middleware/security');
 const { ensureArchiveVariant, deleteArchiveVariant } = require('../utils/image-variants');
+
+const router = createAsyncRouter();
 
 // set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);

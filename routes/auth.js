@@ -1,8 +1,9 @@
-const express = require('express');
-const router = express.Router();
+const { createAsyncRouter } = require('../middleware/async-router');
 const bcrypt = require('bcrypt');
 
 const { preventLogin } = require('../middleware/auth');
+
+const router = createAsyncRouter();
 
 router.get('/login', preventLogin, (req, res) => {
   res.render('admin/login');

@@ -1,5 +1,6 @@
-const express = require('express');
-const router = express.Router();
+const { createAsyncRouter } = require('../middleware/async-router');
+
+const router = createAsyncRouter();
 
 // home
 router.get('/', async (req, res) => {

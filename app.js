@@ -29,6 +29,36 @@ const adminRoutes = require('./routes/admin');
 
 const { ensureAdmin } = require('./middleware/auth');
 
+function requestExpectsJson(req) {
+  const requestedWith = (req.get('X-Requested-With') || '').toLowerCase();
+  const accept = (req.get('Accept') || '').toLowerCase();
+
+  return requestedWith === 'xmlhttprequest' || accept.includes('application/json');
+}
+
+function isAdminRequest(req) {
+  return req.originalUrl === '/admin' || req.originalUrl.startsWith('/admin/');
+}
+
+function isAuthRequest(req) {
+  return req.originalUrl === '/login' || req.originalUrl === '/logout';
+}
+
+function getErrorStatusCode(err) {
+  if (Number.isInteger(err && err.statusCode)) return err.statusCode;
+  if (Number.isInteger(err && err.status)) return err.status;
+  if (err && err.name === 'MulterError') return 400;
+  return 500;
+}
+
+function getUserFacingErrorMessage(err, statusCode) {
+  if (statusCode >= 500) {
+    return 'An unexpected error occurred. Please try again.';
+  }
+
+  return (err && err.message) || 'The request could not be completed.';
+}
+
 (async () => {
   ensureDbDirectoryExists();
   console.log(`Using SQLite database at: ${DB_FILE_PATH}`);
@@ -231,21 +261,41 @@ const { ensureAdmin } = require('./middleware/auth');
 
   // Error handling middleware
   app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    
-    // Multer errors
-    if (err.name === 'MulterError') {
-      if (err.field) {
-        req.flash('error', `File upload error in field "${err.field}": ${err.message}`);
-      } else {
-        req.flash('error', 'File upload error: ' + err.message);
-      }
-      return res.redirect(req.get('referrer') || '/admin');
+    if (res.headersSent) {
+      return next(err);
     }
-    
-    // Generic errors
-    req.flash('error', err.message || 'An error occurred');
-    res.redirect(req.get('referrer') || '/admin');
+
+    const statusCode = getErrorStatusCode(err);
+    const adminRequest = isAdminRequest(req);
+    const authRequest = isAuthRequest(req);
+    const expectsJson = requestExpectsJson(req);
+    const userMessage = err && err.name === 'MulterError'
+      ? (err.field ? `File upload error in field "${err.field}": ${err.message}` : `File upload error: ${err.message}`)
+      : getUserFacingErrorMessage(err, statusCode);
+
+    console.error(`Request error on ${req.method} ${req.originalUrl}:`, err);
+
+    if (expectsJson) {
+      return res.status(statusCode).json({ error: userMessage });
+    }
+
+    if ((adminRequest || authRequest) && req.method !== 'GET') {
+      if (typeof req.flash === 'function') {
+        req.flash('error', userMessage);
+      }
+
+      const fallbackPath = authRequest ? '/login' : '/admin';
+      return res.status(statusCode).redirect(req.get('referrer') || fallbackPath);
+    }
+
+    if (statusCode === 404) {
+      return res.status(404).render('404');
+    }
+
+    return res.status(statusCode).render('500', {
+      message: userMessage,
+      statusCode,
+    });
   });
 
   // 404
