@@ -63,12 +63,120 @@ NIGHTVAULT combines a dark retro-inspired interface with a self-hosted media and
 - express-session with persistent SQLite session store
 - WaveSurfer.js
 
-## Standard Setup
+## Docker Setup
+
+NIGHTVAULT can be run directly from the published Docker image.
+
+### Create a folder for the deployment
+
+Linux/macOS:
+
+```bash
+mkdir nightvault && cd nightvault
+```
+
+Windows CMD:
+
+```cmd
+mkdir nightvault
+cd nightvault
+```
+
+### Create a `.env` file
+
+Create a local `.env` file with at least:
+
+```env
+SESSION_SECRET=replace-this-with-a-long-random-secret
+TRUST_PROXY=1
+```
+
+You can also use the full example from the [Environment Variables](#environment-variables) section below.
+
+### Create `docker-compose.yml`
+
+```yaml
+services:
+  nightvault:
+    image: ghcr.io/uidcheck/nightvault:latest
+    container_name: nightvault
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_PATH: /app/data/nightvault.db
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+```
+
+### Create persistent data folders
+
+These folders are mounted into the container so database content and uploads are not lost when recreating the container.
+
+Linux/macOS:
+
+```bash
+mkdir -p data uploads
+```
+
+Windows CMD:
+
+```cmd
+mkdir data
+mkdir uploads
+```
+
+### Pull and start the container
+
+```bash
+docker compose up -d
+```
+
+### Update to the latest image
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### Open the site
+
+```text
+http://localhost:3000
+```
+
+### View logs
+
+```bash
+docker compose logs -f
+```
+
+### Stop the container
+
+```bash
+docker compose down
+```
+
+## Run From Source
+
+If you want to run NIGHTVAULT from source instead of Docker:
 
 1. Clone or download the repository.
 2. Change into the project folder.
 3. Copy `.env.example` to `.env`.
 4. Set a strong random value for `SESSION_SECRET` in `.env`.
+
+Clone the repository:
+
+```bash
+git clone https://github.com/uidcheck/nightvault.git
+cd nightvault
+```
 
 Install dependencies:
 
@@ -102,87 +210,6 @@ Password: password
 ```
 
 **Important:** Change the default admin password immediately after first login. See [Changing the Admin Password](#changing-the-admin-password).
-
-## Docker Setup
-
-This project can also be run with Docker Compose.
-
-Clone the repository:
-
-```bash
-git clone https://github.com/uidcheck/nightvault.git
-cd nightvault
-```
-
-Copy the environment file.
-
-Linux/macOS:
-
-```bash
-cp .env.example .env
-```
-
-Windows CMD:
-
-```cmd
-copy .env.example .env
-```
-
-Then edit `.env` and set a strong `SESSION_SECRET`.
-
-For Docker, database storage is configured via:
-
-```text
-DB_PATH=/app/data/nightvault.db
-```
-
-in `docker-compose.yml`.
-
-### Create persistent data folders
-
-These folders are mounted into the container so database content and uploads are not lost when rebuilding.
-
-Linux/macOS:
-
-```bash
-mkdir -p data uploads/music uploads/videos uploads/images uploads/projects uploads/documents
-```
-
-Windows CMD:
-
-```cmd
-mkdir data
-mkdir uploads
-mkdir uploads\music
-mkdir uploads\videos
-mkdir uploads\images
-mkdir uploads\projects
-mkdir uploads\documents
-```
-
-### Build and start the container
-
-```bash
-docker compose up -d --build
-```
-
-### Open the site
-
-```text
-http://localhost:3000
-```
-
-### View logs
-
-```bash
-docker compose logs -f
-```
-
-### Stop the container
-
-```bash
-docker compose down
-```
 
 ## Environment Variables
 
@@ -319,7 +346,7 @@ Sessions are stored in the `sessions` table within the same SQLite database. Thi
 
 - `SESSION_SECRET` is required when `NODE_ENV=production`
 - In local development, if `SESSION_SECRET` is not set, the app uses a temporary fallback secret and logs a warning
-- Session cookies are configured as `nightvault.sid`, are `httpOnly` with `sameSite=strict` and use automatic secure handling in production
+- Session cookies default to `nightvault.sid`, are `httpOnly` with `sameSite=strict` and use automatic secure handling in production
 - `TRUST_PROXY=1` is recommended when running behind HTTPS via a reverse proxy so secure cookies are detected correctly
 - State-changing auth and admin forms are protected by CSRF tokens
 
@@ -340,7 +367,7 @@ When running with Docker Compose:
 - SQLite database data is stored in `./data`
 - Docker sets `DB_PATH=/app/data/nightvault.db` and mounts `./data:/app/data`
 - Uploaded files are stored in `./uploads`
-- Rebuilding the container does not remove your content as long as those folders are preserved
+- Recreating the container does not remove your content as long as those folders are preserved
 - The default admin account is automatically created on first startup
 
 On first access:
